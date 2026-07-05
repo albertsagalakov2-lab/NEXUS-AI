@@ -405,9 +405,9 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#03050a] px-4 pb-24 pt-5 text-white sm:px-6 lg:px-8 lg:pb-10 lg:pt-8">
-      <div className="mx-auto max-w-6xl">
-        <div className="mb-5 flex items-center justify-between lg:mb-7">
+    <div className="min-h-screen bg-[#03050a] px-4 pb-24 pt-5 text-white [scrollbar-gutter:stable] sm:px-6 lg:h-dvh lg:min-h-0 lg:overflow-y-scroll lg:px-8 lg:pb-10 lg:pt-8">
+      <div className="mx-auto w-full max-w-6xl">
+        <div className="mb-5 flex min-h-[58px] items-center justify-between lg:mb-7">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-violet-300/80">
               Аккаунт
@@ -447,8 +447,8 @@ export default function ProfilePage() {
           })}
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[210px_minmax(0,1fr)]">
-          <aside className="hidden rounded-2xl border border-white/[0.07] bg-[#070a12] p-2 lg:block">
+        <div className="grid items-start gap-6 lg:grid-cols-[210px_minmax(0,1fr)]">
+          <aside className="hidden rounded-2xl border border-white/[0.07] bg-[#070a12] p-2 lg:sticky lg:top-8 lg:block">
             <p className="px-3 pb-2 pt-2 text-[10px] font-medium uppercase tracking-[0.18em] text-slate-600">
               Аккаунт
             </p>
@@ -484,9 +484,9 @@ export default function ProfilePage() {
             </button>
           </aside>
 
-          <main className="min-w-0">
+          <main className="min-h-[620px] min-w-0 w-full">
             {activeSection === "profile" && (
-              <div className="space-y-5">
+              <div className="min-h-[620px] w-full space-y-5">
                 <section className="rounded-2xl border border-white/[0.075] bg-[#070a12] p-4 sm:p-5">
                   <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                     <div className="relative h-24 w-24 shrink-0">
@@ -649,7 +649,8 @@ export default function ProfilePage() {
             )}
 
             {activeSection === "pricing" && (
-              <section className="rounded-2xl border border-white/[0.075] bg-[#070a12] p-5 sm:p-6">
+              <div className="min-h-[620px] w-full">
+                <section className="rounded-2xl border border-white/[0.075] bg-[#070a12] p-5 sm:p-6">
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-xs font-medium uppercase tracking-[0.16em] text-violet-300/80">
@@ -689,11 +690,12 @@ export default function ProfilePage() {
                 >
                   Посмотреть тарифы
                 </Link>
-              </section>
+                </section>
+              </div>
             )}
 
             {activeSection === "tokens" && (
-              <div className="space-y-5">
+              <div className="min-h-[620px] w-full space-y-5">
                 <section className="rounded-2xl border border-white/[0.075] bg-[#070a12] p-5 sm:p-6">
                   <div className="flex items-start gap-4">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/12 text-violet-300">
