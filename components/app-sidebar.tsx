@@ -97,6 +97,7 @@ export function AppSidebar() {
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
   const [userPlan, setUserPlan] = useState("free");
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [editingThreadId, setEditingThreadId] = useState("");
   const [editingTitle, setEditingTitle] = useState("");
 
@@ -124,6 +125,11 @@ export function AppSidebar() {
       if (!user) return;
 
       setUserEmail(user.email || "");
+      setAvatarUrl(
+        typeof user.user_metadata?.avatar_url === "string"
+          ? user.user_metadata.avatar_url
+          : "",
+      );
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -167,6 +173,7 @@ export function AppSidebar() {
     window.addEventListener("storage", refresh);
     window.addEventListener("focus", refresh);
     window.addEventListener("nexusai-chats-updated", refresh);
+    window.addEventListener("neiropeiro-profile-updated", refresh);
     window.addEventListener("neiropeiro-open-mobile-menu", openMobileMenu);
     window.addEventListener("neiropeiro-open-search", openSearch);
 
@@ -174,6 +181,7 @@ export function AppSidebar() {
       window.removeEventListener("storage", refresh);
       window.removeEventListener("focus", refresh);
       window.removeEventListener("nexusai-chats-updated", refresh);
+      window.removeEventListener("neiropeiro-profile-updated", refresh);
       window.removeEventListener("neiropeiro-open-mobile-menu", openMobileMenu);
       window.removeEventListener("neiropeiro-open-search", openSearch);
     };
@@ -431,10 +439,18 @@ export function AppSidebar() {
           <Link
             href="/profile"
             onClick={() => setMobileOpen(false)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 via-violet-500 to-fuchsia-500 text-sm font-semibold text-white"
+            className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-400 via-violet-500 to-fuchsia-500 text-sm font-semibold text-white ring-1 ring-white/10"
             aria-label="Профиль"
           >
-            {displayUser.slice(0, 1).toUpperCase()}
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={displayUser}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              displayUser.slice(0, 1).toUpperCase()
+            )}
           </Link>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-white">
@@ -626,17 +642,30 @@ export function AppSidebar() {
             </Link>
           </div>
           <div className="flex items-center gap-2.5 rounded-xl px-2 py-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 via-violet-500 to-fuchsia-500 text-[11px] font-semibold text-white">
-              {displayUser.slice(0, 1).toUpperCase()}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-white">
-                {displayUser}
-              </p>
-              <p className="np-sidebar-plan truncate">
-                {getPlanLabel(userPlan)}
-              </p>
-            </div>
+            <Link
+              href="/profile"
+              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-violet-400/70"
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-400 via-violet-500 to-fuchsia-500 text-[11px] font-semibold text-white ring-1 ring-white/10">
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={displayUser}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  displayUser.slice(0, 1).toUpperCase()
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-white">
+                  {displayUser}
+                </p>
+                <p className="np-sidebar-plan truncate">
+                  {getPlanLabel(userPlan)}
+                </p>
+              </div>
+            </Link>
             <button
               type="button"
               onClick={handleSignOut}
@@ -653,11 +682,19 @@ export function AppSidebar() {
         <div className="flex flex-col items-center gap-2 border-t border-white/[0.055] px-2 py-3">
           <Link
             href="/profile"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 via-violet-500 to-fuchsia-500 text-[11px] font-semibold text-white"
+            className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-400 via-violet-500 to-fuchsia-500 text-[11px] font-semibold text-white ring-1 ring-white/10"
             title={displayUser}
             aria-label="Открыть профиль"
           >
-            {displayUser.slice(0, 1).toUpperCase()}
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={displayUser}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              displayUser.slice(0, 1).toUpperCase()
+            )}
           </Link>
           <button
             type="button"
@@ -722,6 +759,28 @@ export function AppSidebar() {
             Регистрация
           </Link>
         </div>
+      )}
+
+      {userEmail && (
+        <Link
+          href="/profile"
+          className="fixed right-6 top-5 z-30 hidden h-10 items-center gap-2 rounded-full border border-white/[0.1] bg-[#080b13]/90 p-1 pr-3 text-xs text-slate-200 shadow-[0_10px_35px_rgba(0,0,0,0.28)] backdrop-blur-xl transition hover:border-violet-400/35 hover:bg-white/[0.055] lg:flex"
+          aria-label="Открыть аккаунт"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-400 via-violet-500 to-fuchsia-500 text-[11px] font-semibold text-white ring-1 ring-white/10">
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={displayUser}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              displayUser.slice(0, 1).toUpperCase()
+            )}
+          </span>
+          <span className="max-w-32 truncate font-medium">{displayUser}</span>
+          <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
+        </Link>
       )}
 
       {mobileOpen && (
