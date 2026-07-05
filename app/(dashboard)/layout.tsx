@@ -12,7 +12,7 @@ export default function DashboardLayout({
       <AppearanceProvider />
       <AppSidebar />
 
-      <main className="min-h-screen w-full pb-20 transition-all duration-300 md:pb-0 md:pl-72">
+      <main className="min-h-screen w-full pb-[70px] pt-16 lg:pb-0 lg:pl-[248px] lg:pt-0">
         {children}
       </main>
 

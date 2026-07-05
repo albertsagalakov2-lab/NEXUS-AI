@@ -418,3 +418,170 @@ html {
       radial-gradient(circle at 96% 9%, rgb(14 165 233 / 0.11), transparent 17rem);
   }
 }
+
+/* NeiroPeiro clean workspace */
+
+.neiropeiro-workspace {
+  background:
+    radial-gradient(circle at 62% 38%, rgb(37 99 235 / 0.055), transparent 28rem),
+    radial-gradient(circle at 33% 20%, rgb(124 58 237 / 0.045), transparent 24rem),
+    #03050a;
+}
+
+.neiropeiro-stars {
+  opacity: 0.58;
+  background-image:
+    radial-gradient(circle, rgb(255 255 255 / 0.5) 0 0.7px, transparent 0.9px),
+    radial-gradient(circle, rgb(96 165 250 / 0.32) 0 0.65px, transparent 0.9px);
+  background-position: 0 0, 31px 19px;
+  background-size: 67px 67px, 97px 97px;
+  mask-image: linear-gradient(to bottom, black 0%, rgb(0 0 0 / 0.7) 55%, transparent 100%);
+}
+
+.np-sidebar-item {
+  display: flex;
+  min-height: 39px;
+  width: 100%;
+  align-items: center;
+  gap: 11px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  padding: 0 10px;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 450;
+  text-align: left;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.np-sidebar-item svg {
+  color: #2488ff;
+}
+
+.np-sidebar-item:hover {
+  border-color: rgb(255 255 255 / 0.045);
+  background: rgb(255 255 255 / 0.035);
+  color: #f8fafc;
+}
+
+.np-sidebar-item-active {
+  border-color: rgb(96 165 250 / 0.12);
+  background: linear-gradient(90deg, rgb(37 99 235 / 0.1), rgb(124 58 237 / 0.045));
+  color: #ffffff;
+}
+
+.np-sidebar-new-chat {
+  margin-bottom: 1px;
+  color: #e2e8f0;
+}
+
+.np-composer {
+  overflow: hidden;
+  border: 1px solid rgb(148 163 184 / 0.15);
+  border-radius: 19px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.035), transparent 58%),
+    rgb(11 15 24 / 0.94);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.045),
+    0 22px 70px rgb(0 0 0 / 0.22);
+  backdrop-filter: blur(20px);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.np-composer:focus-within {
+  border-color: rgb(99 102 241 / 0.45);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.055),
+    0 0 0 3px rgb(99 102 241 / 0.08),
+    0 25px 80px rgb(0 0 0 / 0.28);
+}
+
+.np-composer-chip {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgb(255 255 255 / 0.07);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 0.025);
+  padding: 0 10px;
+  color: #94a3b8;
+  font-size: 11px;
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.np-composer-chip:hover {
+  border-color: rgb(96 165 250 / 0.22);
+  background: rgb(37 99 235 / 0.06);
+  color: #e2e8f0;
+}
+
+.np-quick-action {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid rgb(255 255 255 / 0.055);
+  border-radius: 13px;
+  background: rgb(255 255 255 / 0.022);
+  padding: 11px 12px;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.02);
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+.np-quick-action:hover {
+  transform: translateY(-1px);
+  border-color: rgb(96 165 250 / 0.16);
+  background: rgb(37 99 235 / 0.045);
+}
+
+.np-icon-button {
+  display: flex;
+  height: 34px;
+  width: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(255 255 255 / 0.055);
+  border-radius: 10px;
+  background: rgb(3 5 10 / 0.6);
+  color: #64748b;
+  backdrop-filter: blur(12px);
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease;
+}
+
+.np-icon-button:hover {
+  border-color: rgb(255 255 255 / 0.1);
+  background: rgb(255 255 255 / 0.035);
+  color: #e2e8f0;
+}
+
+@media (max-width: 639px) {
+  .neiropeiro-stars {
+    opacity: 0.38;
+    background-size: 72px 72px, 109px 109px;
+  }
+
+  .np-composer {
+    border-radius: 17px;
+  }
+
+  .np-quick-action {
+    min-height: 61px;
+    padding: 10px;
+  }
+}

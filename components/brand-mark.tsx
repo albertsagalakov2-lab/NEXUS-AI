@@ -10,7 +10,7 @@ export function BrandMark({
 }) {
   return (
     <div className={cn("flex items-center gap-3", className)}>
-      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-2xl border border-fuchsia-400/30 bg-[#080d29] shadow-[0_0_24px_rgba(168,85,247,0.28)]">
+      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#080b13] shadow-[0_0_20px_rgba(79,70,229,0.14)]">
         <Image
           src="/neiropeiro-mascot.png"
           alt="Логотип NeiroPeiro"
