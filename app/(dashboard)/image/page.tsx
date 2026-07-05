@@ -17,7 +17,6 @@ import {
   Download,
   FileVideo,
   Image as ImageIcon,
-  Loader2,
   Paperclip,
   Plus,
   Settings2,
@@ -129,6 +128,41 @@ function ModelIcon({ model, className }: { model: ModelOption; className?: strin
     >
       <Sparkles className="h-5 w-5" />
     </span>
+  )
+}
+
+function LoadingSpinner({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={cn("h-5 w-5", className)}
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        opacity="0.18"
+      />
+      <path
+        d="M21 12a9 9 0 0 0-9-9"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      >
+        <animateTransform
+          attributeName="transform"
+          type="rotate"
+          from="0 12 12"
+          to="360 12 12"
+          dur="0.85s"
+          repeatCount="indefinite"
+        />
+      </path>
+    </svg>
   )
 }
 
@@ -359,124 +393,128 @@ export default function ImageGenerationPage() {
   }
 
   const composer = (
-    <div className="w-full rounded-[24px] border border-white/[0.10] bg-[#0a0f1d]/92 p-3 shadow-[0_22px_70px_rgba(0,0,0,0.34)] backdrop-blur-xl sm:p-4">
-      <Textarea
-        value={prompt}
-        onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setPrompt(event.target.value)}
-        onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => {
-          if (event.key === "Enter" && !event.shiftKey) {
-            event.preventDefault()
-            handleGenerate()
-          }
-        }}
-        placeholder="Опишите изображение..."
-        className="min-h-[92px] resize-none border-0 bg-transparent px-2 py-2 text-base text-white shadow-none placeholder:text-slate-600 focus-visible:ring-0 sm:min-h-[108px]"
-      />
+    <div className="w-full overflow-hidden rounded-[22px] border border-white/[0.09] bg-[#0a0f1d]/94 shadow-[0_18px_55px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+      <div className="px-3.5 pt-3.5 sm:px-4 sm:pt-4">
+        <Textarea
+          value={prompt}
+          onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setPrompt(event.target.value)}
+          onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault()
+              handleGenerate()
+            }
+          }}
+          placeholder="Опишите изображение..."
+          className="min-h-[76px] resize-none border-0 bg-transparent px-1.5 py-1.5 text-[15px] leading-6 text-white shadow-none placeholder:text-slate-600 focus-visible:ring-0 sm:min-h-[88px] sm:text-base"
+        />
 
-      {referenceFile && (
-        <div className="mx-1 mb-3 flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-2.5">
-          <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-black/30">
-            {referenceFile.type.startsWith("image/") && previewUrl ? (
-              <img src={previewUrl} alt="Предпросмотр" className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-blue-300">
-                <FileVideo className="h-5 w-5" />
-              </div>
-            )}
+        {referenceFile && (
+          <div className="mb-3 flex items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.03] p-2">
+            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-black/30">
+              {referenceFile.type.startsWith("image/") && previewUrl ? (
+                <img src={previewUrl} alt="Предпросмотр" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-blue-300">
+                  <FileVideo className="h-4 w-4" />
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-slate-200 sm:text-sm">{referenceFile.name}</p>
+              <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                {referenceFile.type.startsWith("video/")
+                  ? "Видео-референс · используем кадр"
+                  : "Изображение-референс"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReferenceFile(null)}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white/[0.06] hover:text-white"
+              aria-label="Убрать файл"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-slate-200">{referenceFile.name}</p>
-            <p className="mt-0.5 text-xs text-slate-500">
-              {referenceFile.type.startsWith("video/")
-                ? "Видео-референс · используем кадр из видео"
-                : "Изображение-референс"}
-            </p>
-          </div>
+        )}
+      </div>
+
+      <div className="border-t border-white/[0.055] bg-black/[0.06] px-2.5 py-2.5 sm:px-3">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+            className="h-9 w-9 shrink-0 rounded-[11px] border border-white/[0.07] bg-white/[0.03] text-slate-300 hover:bg-white/[0.07] hover:text-white"
+            title="Прикрепить фото или видео"
+          >
+            <Paperclip className="hidden h-4 w-4 sm:block" />
+            <Plus className="h-4 w-4 sm:hidden" />
+          </Button>
+
           <button
             type="button"
-            onClick={() => setReferenceFile(null)}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-white/[0.06] hover:text-white"
-            aria-label="Убрать файл"
+            onClick={() => setModelDialogOpen(true)}
+            className="flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-[11px] border border-white/[0.07] bg-white/[0.03] px-2.5 text-xs text-slate-200 transition hover:bg-white/[0.07] sm:w-[188px] sm:flex-none sm:text-sm"
           >
-            <X className="h-4 w-4" />
+            <ModelIcon model={selectedModel} className="h-6 w-6 rounded-md text-sm" />
+            <span className="min-w-0 flex-1 truncate text-left font-medium">{selectedModel.label}</span>
+            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-500" />
           </button>
+
+          <div className="ml-auto hidden items-center gap-1.5 md:flex">
+            <Select value={aspectRatio} onValueChange={setAspectRatio}>
+              <SelectTrigger className="h-9 w-[78px] rounded-[11px] border-white/[0.07] bg-white/[0.03] px-2.5 text-xs text-slate-200">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ASPECT_RATIOS.map((ratio) => (
+                  <SelectItem key={ratio} value={ratio}>{ratio}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={imageSize} onValueChange={setImageSize}>
+              <SelectTrigger className="h-9 w-[68px] rounded-[11px] border-white/[0.07] bg-white/[0.03] px-2.5 text-xs text-slate-200">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {IMAGE_SIZES.map((size) => (
+                  <SelectItem key={size} value={size}>{size}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setSettingsDialogOpen(true)}
+            className="h-9 w-9 shrink-0 rounded-[11px] border border-white/[0.07] bg-white/[0.03] text-slate-300 hover:bg-white/[0.07] hover:text-white md:hidden"
+            aria-label="Параметры"
+          >
+            <Settings2 className="h-4 w-4" />
+          </Button>
+
+          <Button
+            type="button"
+            size="icon"
+            onClick={handleGenerate}
+            disabled={!prompt.trim() || isSubmitting}
+            className="h-9 w-9 shrink-0 rounded-full bg-gradient-to-br from-blue-500 via-violet-500 to-fuchsia-500 text-white shadow-[0_0_22px_rgba(124,58,237,0.24)] hover:opacity-90 disabled:opacity-35"
+            aria-label="Создать изображение"
+          >
+            {isSubmitting ? <LoadingSpinner className="h-4 w-4" /> : <ArrowUp className="h-4 w-4" />}
+          </Button>
         </div>
-      )}
-
-      <div className="flex min-w-0 items-center gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={() => fileInputRef.current?.click()}
-          className="h-11 w-11 shrink-0 rounded-xl border border-white/[0.07] bg-white/[0.035] text-slate-300 hover:bg-white/[0.07] hover:text-white"
-          title="Прикрепить фото или видео"
-        >
-          <Paperclip className="hidden h-5 w-5 sm:block" />
-          <Plus className="h-5 w-5 sm:hidden" />
-        </Button>
-
-        <button
-          type="button"
-          onClick={() => setModelDialogOpen(true)}
-          className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.035] px-3 text-sm text-slate-200 transition hover:bg-white/[0.07] sm:flex-none"
-        >
-          <ModelIcon model={selectedModel} className="h-7 w-7 rounded-lg text-base" />
-          <span className="truncate font-medium sm:max-w-[170px]">{selectedModel.label}</span>
-          <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
-        </button>
-
-        <div className="ml-auto hidden items-center gap-2 md:flex">
-          <Select value={aspectRatio} onValueChange={setAspectRatio}>
-            <SelectTrigger className="h-11 w-[94px] rounded-xl border-white/[0.07] bg-white/[0.035] text-slate-200">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ASPECT_RATIOS.map((ratio) => (
-                <SelectItem key={ratio} value={ratio}>{ratio}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={imageSize} onValueChange={setImageSize}>
-            <SelectTrigger className="h-11 w-[82px] rounded-xl border-white/[0.07] bg-white/[0.035] text-slate-200">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {IMAGE_SIZES.map((size) => (
-                <SelectItem key={size} value={size}>{size}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          onClick={() => setSettingsDialogOpen(true)}
-          className="h-11 w-11 shrink-0 rounded-xl border border-white/[0.07] bg-white/[0.035] text-slate-300 hover:bg-white/[0.07] hover:text-white md:hidden"
-          aria-label="Параметры"
-        >
-          <Settings2 className="h-5 w-5" />
-        </Button>
-
-        <Button
-          type="button"
-          size="icon"
-          onClick={handleGenerate}
-          disabled={!prompt.trim() || isSubmitting}
-          className="h-11 w-11 shrink-0 rounded-full bg-gradient-to-br from-blue-500 via-violet-500 to-fuchsia-500 text-white shadow-[0_0_28px_rgba(124,58,237,0.28)] hover:opacity-90 disabled:opacity-35"
-          aria-label="Создать изображение"
-        >
-          {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowUp className="h-5 w-5" />}
-        </Button>
       </div>
     </div>
   )
 
   return (
-    <div className="relative min-h-[calc(100dvh-64px)] overflow-x-hidden bg-[#040718] px-4 pb-28 pt-5 sm:px-6 lg:min-h-screen lg:px-8 lg:pb-10 lg:pt-8">
+    <div className="relative min-h-[calc(100dvh-64px)] overflow-x-hidden bg-[#040718] px-3 pb-28 pt-4 sm:px-5 lg:min-h-screen lg:px-7 lg:pb-10 lg:pt-7">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_50%_-10%,rgba(74,67,255,0.10),transparent_34rem),radial-gradient(circle_at_85%_12%,rgba(14,165,233,0.06),transparent_28rem)]" />
 
       <input
@@ -487,16 +525,16 @@ export default function ImageGenerationPage() {
         onChange={handleFileChange}
       />
 
-      <main className="mx-auto w-full max-w-[1120px]">
+      <main className="mx-auto w-full max-w-[1080px]">
         {error && (
           <div className="mb-4 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
             {error}
           </div>
         )}
 
-        <section className="mx-auto w-full max-w-4xl pt-2 sm:pt-4">
-          <div className="mb-6 text-center sm:mb-8">
-            <h1 className="text-2xl font-semibold tracking-[-0.03em] text-white sm:text-3xl">
+        <section className="mx-auto w-full max-w-[820px] pt-1 sm:pt-3">
+          <div className="mb-5 text-center sm:mb-6">
+            <h1 className="text-[22px] font-semibold tracking-[-0.03em] text-white sm:text-[28px]">
               Создание изображений
             </h1>
             <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">
@@ -509,7 +547,7 @@ export default function ImageGenerationPage() {
           </p>
         </section>
 
-        <section className="mt-10 sm:mt-12">
+        <section className="mx-auto mt-9 w-full max-w-[1000px] sm:mt-10">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
               <h2 className="text-lg font-semibold text-white sm:text-xl">История генераций</h2>
@@ -528,7 +566,7 @@ export default function ImageGenerationPage() {
 
           {isLoading ? (
             <div className="flex min-h-[260px] items-center justify-center rounded-[26px] border border-white/[0.07] bg-white/[0.02]">
-              <Loader2 className="h-7 w-7 animate-spin text-violet-400" />
+              <LoadingSpinner className="h-6 w-6 text-violet-400" />
             </div>
           ) : images.length === 0 ? (
             <div className="flex min-h-[250px] flex-col items-center justify-center rounded-[26px] border border-dashed border-white/[0.10] bg-white/[0.018] px-6 text-center">
@@ -541,7 +579,7 @@ export default function ImageGenerationPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               {images.map((image) => {
                 const imageModel = getModel(image.style)
                 const completed = image.status === "completed" && isPublicImageUrl(image.image_url)
@@ -551,17 +589,17 @@ export default function ImageGenerationPage() {
                 return (
                   <article
                     key={image.id}
-                    className="min-w-0 overflow-hidden rounded-[24px] border border-white/[0.08] bg-[#090e1b]/92 shadow-[0_18px_60px_rgba(0,0,0,0.28)]"
+                    className="min-w-0 overflow-hidden rounded-[20px] border border-white/[0.075] bg-[#090e1b]/92 shadow-[0_14px_45px_rgba(0,0,0,0.24)]"
                   >
-                    <div className="flex items-center gap-3 border-b border-white/[0.07] px-4 py-3.5">
-                      <ModelIcon model={imageModel} className="h-8 w-8 rounded-lg text-base" />
+                    <div className="flex items-center gap-2.5 border-b border-white/[0.06] px-3.5 py-3">
+                      <ModelIcon model={imageModel} className="h-7 w-7 rounded-lg text-sm" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-slate-100">{imageModel.label}</p>
                         <p className="mt-0.5 text-[11px] text-slate-600">{formatDate(image.created_at)}</p>
                       </div>
                       <span
                         className={cn(
-                          "rounded-full px-2.5 py-1 text-[11px] font-medium",
+                          "rounded-full px-2 py-0.5 text-[10px] font-medium",
                           processing && "bg-violet-500/10 text-violet-300",
                           completed && "bg-emerald-500/10 text-emerald-300",
                           failed && "bg-red-500/10 text-red-300"
@@ -571,22 +609,22 @@ export default function ImageGenerationPage() {
                       </span>
                     </div>
 
-                    <div className="border-b border-white/[0.06] px-4 py-3">
+                    <div className="border-b border-white/[0.055] px-3.5 py-2.5">
                       <p className="line-clamp-3 text-sm leading-6 text-slate-300">{image.prompt}</p>
                     </div>
 
-                    <div className="relative flex min-h-[260px] items-center justify-center bg-[#060a14] p-3 sm:min-h-[300px]">
+                    <div className="relative flex min-h-[220px] items-center justify-center bg-[#060a14] p-2.5 sm:min-h-[250px]">
                       {completed ? (
                         <img
                           src={image.image_url || ""}
                           alt={image.prompt}
-                          className="max-h-[430px] w-full rounded-[18px] object-contain"
+                          className="max-h-[380px] w-full rounded-[15px] object-contain"
                         />
                       ) : processing ? (
                         <div className="flex w-full flex-col items-center justify-center">
-                          <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-400/15 bg-violet-500/[0.06]">
-                            <Loader2 className="h-7 w-7 animate-spin text-violet-400" />
-                            <span className="absolute inset-0 animate-pulse rounded-2xl shadow-[0_0_36px_rgba(124,58,237,0.18)]" />
+                          <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-400/15 bg-violet-500/[0.06]">
+                            <LoadingSpinner className="h-6 w-6 text-violet-400" />
+                            <span className="pointer-events-none absolute inset-0 animate-pulse rounded-2xl shadow-[0_0_30px_rgba(124,58,237,0.16)]" />
                           </div>
                           <p className="mt-4 text-sm font-medium text-slate-300">Генерация продолжается</p>
                           <p className="mt-1 text-xs text-slate-600">Можно обновить страницу или вернуться позже</p>
@@ -599,7 +637,7 @@ export default function ImageGenerationPage() {
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 px-4 py-3">
+                    <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
                       <p className="min-w-0 flex-1 truncate text-xs text-slate-600">
                         {image.aspect_ratio || "1:1"}
                       </p>
@@ -609,7 +647,7 @@ export default function ImageGenerationPage() {
                             href={image.image_url || "#"}
                             target="_blank"
                             rel="noreferrer"
-                            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.035] text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
+                            className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-white/[0.08] bg-white/[0.03] text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
                             aria-label="Скачать изображение"
                           >
                             <Download className="h-4 w-4" />
@@ -619,11 +657,11 @@ export default function ImageGenerationPage() {
                           type="button"
                           onClick={() => handleDelete(image.id)}
                           disabled={deletingId === image.id}
-                          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.035] text-slate-400 transition hover:border-red-400/25 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
+                          className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-white/[0.08] bg-white/[0.03] text-slate-400 transition hover:border-red-400/25 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
                           aria-label="Удалить генерацию"
                         >
                           {deletingId === image.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <LoadingSpinner className="h-3.5 w-3.5" />
                           ) : (
                             <Trash2 className="h-4 w-4" />
                           )}
