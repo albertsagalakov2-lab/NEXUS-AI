@@ -425,7 +425,7 @@ function ChatPageContent() {
 
   if (!isReady) {
     return (
-      <div className="flex h-[calc(100dvh-134px)] items-center justify-center bg-[#03050a] lg:h-screen">
+      <div className="flex h-[calc(100dvh-64px)] items-center justify-center overflow-hidden bg-[#03050a] lg:h-screen">
         <div className="flex items-center gap-2 text-sm text-slate-500">
           <Sparkles className="h-4 w-4 animate-pulse text-violet-400" />
           Загружаем NeiroPeiro...
@@ -435,7 +435,7 @@ function ChatPageContent() {
   }
 
   return (
-    <div className="neiropeiro-workspace relative flex h-[calc(100dvh-134px)] min-h-[520px] flex-col overflow-hidden lg:h-screen">
+    <div className="neiropeiro-workspace relative flex h-[calc(100dvh-64px)] min-h-0 flex-col overflow-hidden overscroll-none lg:h-screen">
       <div className="pointer-events-none absolute inset-0 neiropeiro-stars" />
 
       <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5 lg:right-5 lg:top-4">
@@ -450,7 +450,7 @@ function ChatPageContent() {
       </div>
 
       {isEmptyChat ? (
-        <div className="relative z-[1] flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-8 sm:px-6 lg:py-12">
+        <div className="relative z-[1] flex min-h-0 flex-1 flex-col items-center justify-end overflow-hidden px-4 pb-[calc(env(safe-area-inset-bottom)+24px)] pt-4 sm:px-6 sm:pb-8 lg:justify-center lg:overflow-y-auto lg:py-12">
           <div className="w-full max-w-[760px]">
             {composer}
 
@@ -592,7 +592,7 @@ export default function ChatPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex h-screen items-center justify-center bg-[#03050a]">
+        <div className="flex h-[calc(100dvh-64px)] items-center justify-center overflow-hidden bg-[#03050a] lg:h-screen">
           <div className="text-sm text-slate-500">Загрузка...</div>
         </div>
       }
