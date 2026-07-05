@@ -385,9 +385,28 @@ export function AppSidebar() {
 
   const sidebarContents = (mobile = false) => (
     <>
-      <div className="flex h-[70px] items-center justify-between border-b border-white/[0.055] px-4">
-        <BrandMark className="[&>div]:h-9 [&>div]:w-9 [&>span]:text-[17px]" />
-        {mobile && (
+      {mobile ? (
+        <div className="flex h-[72px] items-center gap-3 border-b border-white/[0.055] px-4">
+          <Link
+            href="/profile"
+            onClick={() => setMobileOpen(false)}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 via-violet-500 to-fuchsia-500 text-sm font-semibold text-white"
+            aria-label="Профиль"
+          >
+            {displayUser.slice(0, 1).toUpperCase()}
+          </Link>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-white">{displayUser}</p>
+            <p className="truncate text-[11px] text-slate-500">{getPlanLabel(userPlan)}</p>
+          </div>
+          <button
+            type="button"
+            onClick={createNewChat}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 hover:bg-white/5 hover:text-white"
+            aria-label="Новый чат"
+          >
+            <SquarePen className="h-5 w-5" />
+          </button>
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
@@ -396,24 +415,14 @@ export function AppSidebar() {
           >
             <X className="h-5 w-5" />
           </button>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="flex h-[70px] items-center border-b border-white/[0.055] px-4">
+          <BrandMark className="[&>div]:h-9 [&>div]:w-9 [&>span]:text-[17px]" />
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
-        {mobile && (
-          <div className="mb-3 flex items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.025] p-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 via-violet-500 to-fuchsia-500 text-xs font-semibold text-white">
-              {displayUser.slice(0, 1).toUpperCase()}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-white">{displayUser}</p>
-              <p className="truncate text-[11px] text-slate-500">{getPlanLabel(userPlan)}</p>
-            </div>
-            <Link href="/profile" onClick={() => setMobileOpen(false)} className="rounded-lg p-2 text-slate-500 hover:bg-white/5 hover:text-white">
-              <User className="h-4 w-4" />
-            </Link>
-          </div>
-        )}
 
         {mobile && (
           <Link
@@ -466,47 +475,66 @@ export function AppSidebar() {
         <div className="my-3 h-px bg-white/[0.055]" />
         <div className="space-y-0.5">{creationItems.map((item) => renderMenuItem(item, mobile))}</div>
 
-        <div className="my-3 h-px bg-white/[0.055]" />
+        {!mobile && (
+          <>
+            <div className="my-3 h-px bg-white/[0.055]" />
 
-        <button
-          type="button"
-          onClick={toggleRecent}
-          className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-600 hover:text-slate-400"
-        >
-          <span>Недавние чаты</span>
-          {recentCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-        </button>
+            <button
+              type="button"
+              onClick={toggleRecent}
+              className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-600 hover:text-slate-400"
+            >
+              <span>Недавние чаты</span>
+              {recentCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+            </button>
 
-        {!recentCollapsed && (
-          <div className="mt-1 space-y-0.5">
-            {filteredThreads.length > 0 ? (
-              filteredThreads.slice(0, 12).map(renderThread)
-            ) : (
-              <p className="px-2 py-3 text-xs text-slate-600">Чаты не найдены</p>
+            {!recentCollapsed && (
+              <div className="mt-1 space-y-0.5">
+                {filteredThreads.length > 0 ? (
+                  filteredThreads.slice(0, 12).map(renderThread)
+                ) : (
+                  <p className="px-2 py-3 text-xs text-slate-600">Чаты не найдены</p>
+                )}
+              </div>
             )}
-          </div>
+          </>
         )}
       </div>
 
-      <div className="border-t border-white/[0.055] p-3">
-        <div className="flex items-center gap-2.5 rounded-xl px-2 py-2">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 via-violet-500 to-fuchsia-500 text-[11px] font-semibold text-white">
-            {displayUser.slice(0, 1).toUpperCase()}
+      {!mobile && (
+        <div className="border-t border-white/[0.055] p-3">
+          <div className="mb-2 rounded-2xl border border-violet-400/20 bg-gradient-to-r from-violet-500/10 to-blue-500/10 p-3">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="font-medium text-white">3 / 3 генерации</span>
+              <span className="text-slate-500">Сегодня</span>
+            </div>
+            <Link
+              href="/pricing"
+              className="mt-2 flex h-8 items-center justify-center rounded-lg bg-gradient-to-r from-violet-500 to-blue-500 text-xs font-medium text-white"
+            >
+              <Crown className="mr-1.5 h-3.5 w-3.5" />
+              Улучшить план
+            </Link>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium text-white">{displayUser}</p>
-            <p className="truncate text-[10px] text-slate-600">{getPlanLabel(userPlan)}</p>
+          <div className="flex items-center gap-2.5 rounded-xl px-2 py-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 via-violet-500 to-fuchsia-500 text-[11px] font-semibold text-white">
+              {displayUser.slice(0, 1).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-white">{displayUser}</p>
+              <p className="truncate text-[10px] text-slate-600">{getPlanLabel(userPlan)}</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="rounded-lg p-2 text-slate-600 hover:bg-white/5 hover:text-white"
+              title="Выйти"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={handleSignOut}
-            className="rounded-lg p-2 text-slate-600 hover:bg-white/5 hover:text-white"
-            title="Выйти"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
         </div>
-      </div>
+      )}
     </>
   )
 
