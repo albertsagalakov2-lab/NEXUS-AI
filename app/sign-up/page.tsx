@@ -40,7 +40,7 @@ export default function SignUpPage() {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/chat`,
         data: {
           full_name: fullName,
         },
@@ -61,7 +61,7 @@ export default function SignUpPage() {
       return
     }
 
-    router.push("/")
+    router.push("/chat")
     router.refresh()
   }
 

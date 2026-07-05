@@ -40,7 +40,9 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/sign-up") ||
     request.nextUrl.pathname.startsWith("/auth")
 
-  if (!user && !isAuthPage) {
+  const isPublicPage = request.nextUrl.pathname === "/"
+
+  if (!user && !isAuthPage && !isPublicPage) {
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = "/sign-in"
     redirectUrl.searchParams.set(
@@ -51,9 +53,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl)
   }
 
-  if (user && request.nextUrl.pathname.startsWith("/sign-in")) {
+  if (
+    user &&
+    (request.nextUrl.pathname.startsWith("/sign-in") ||
+      request.nextUrl.pathname.startsWith("/sign-up"))
+  ) {
     const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = "/"
+    redirectUrl.pathname = "/chat"
     return NextResponse.redirect(redirectUrl)
   }
 
@@ -62,7 +68,9 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/",
+    "/sign-in",
+    "/sign-up",
+    "/auth/:path*",
     "/chat/:path*",
     "/image/:path*",
     "/video/:path*",
