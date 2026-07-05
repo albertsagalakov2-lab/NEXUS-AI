@@ -1,21 +1,21 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 import {
   Calendar,
@@ -28,124 +28,190 @@ import {
   Sparkles,
   User,
   Video,
-} from "lucide-react"
+} from "lucide-react";
 
 function formatDate(value?: string | null) {
-  if (!value) return "—"
+  if (!value) return "—";
 
   return new Intl.DateTimeFormat("ru-RU", {
     day: "2-digit",
     month: "long",
     year: "numeric",
-  }).format(new Date(value))
+  }).format(new Date(value));
 }
 
 function getPlanLabel(plan?: string | null) {
-  if (!plan || plan === "free") return "Бесплатный тариф"
-  return plan
+  if (!plan || plan === "free") return "Бесплатный тариф";
+  return plan;
+}
+
+async function withTimeout<T>(
+  promise: PromiseLike<T>,
+  timeoutMs = 12000,
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error("Время ожидания истекло"));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([Promise.resolve(promise), timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 }
 
 export default function ProfilePage() {
-  const router = useRouter()
+  const router = useRouter();
 
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const [userId, setUserId] = useState("")
-  const [email, setEmail] = useState("")
-  const [name, setName] = useState("")
-  const [plan, setPlan] = useState("free")
-  const [createdAt, setCreatedAt] = useState<string | null>(null)
+  const [userId, setUserId] = useState("");
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [plan, setPlan] = useState("free");
+  const [createdAt, setCreatedAt] = useState<string | null>(null);
 
-  const [chatsCount, setChatsCount] = useState(0)
-  const [messagesCount, setMessagesCount] = useState(0)
-  const [imagesCount, setImagesCount] = useState(0)
-  const [videosCount, setVideosCount] = useState(0)
+  const [chatsCount, setChatsCount] = useState(0);
+  const [messagesCount, setMessagesCount] = useState(0);
+  const [imagesCount, setImagesCount] = useState(0);
+  const [videosCount, setVideosCount] = useState(0);
 
-  const [successMessage, setSuccessMessage] = useState("")
-  const [errorMessage, setErrorMessage] = useState("")
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadProfile() {
-      const supabase = createClient()
+      const supabase = createClient();
 
-      setIsLoading(true)
-      setErrorMessage("")
+      setIsLoading(true);
+      setLoadError("");
+      setErrorMessage("");
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      try {
+        const authResult = await withTimeout(supabase.auth.getUser());
+        const user = authResult.data.user;
 
-      if (!user) {
-        router.push("/sign-in")
-        return
+        if (!user) {
+          if (!cancelled) {
+            setIsLoading(false);
+            router.replace("/sign-in");
+          }
+          return;
+        }
+
+        if (cancelled) return;
+
+        setUserId(user.id);
+        setEmail(user.email || "");
+        setCreatedAt(user.created_at || null);
+
+        const profileResult = await withTimeout(
+          supabase
+            .from("profiles")
+            .select("full_name,email,plan,created_at")
+            .eq("id", user.id)
+            .maybeSingle(),
+        ).catch((error) => {
+          console.error("Load profile row error:", error);
+          return { data: null, error };
+        });
+
+        const profile = profileResult.data;
+
+        if (!profile) {
+          await withTimeout(
+            supabase.from("profiles").upsert(
+              {
+                id: user.id,
+                email: user.email || "",
+                full_name: "",
+                plan: "free",
+              },
+              { onConflict: "id" },
+            ),
+          ).catch((error) => {
+            console.error("Create profile row error:", error);
+          });
+
+          if (!cancelled) {
+            setName("");
+            setPlan("free");
+          }
+        } else if (!cancelled) {
+          setName(profile.full_name || "");
+          setPlan(profile.plan || "free");
+          setCreatedAt(profile.created_at || user.created_at || null);
+        }
+
+        const countRequests = [
+          supabase
+            .from("chats")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id),
+          supabase
+            .from("chat_messages")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id),
+          supabase
+            .from("image_generations")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id),
+          supabase
+            .from("video_generations")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id),
+        ] as const;
+
+        const results = await Promise.allSettled(
+          countRequests.map((request) => withTimeout(request, 8000)),
+        );
+
+        if (cancelled) return;
+
+        const counts = results.map((result) =>
+          result.status === "fulfilled" ? result.value.count || 0 : 0,
+        );
+
+        setChatsCount(counts[0]);
+        setMessagesCount(counts[1]);
+        setImagesCount(counts[2]);
+        setVideosCount(counts[3]);
+      } catch (error) {
+        console.error("Load profile error:", error);
+        if (!cancelled) {
+          setLoadError(
+            "Профиль загружался слишком долго. Проверьте соединение и попробуйте ещё раз.",
+          );
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
-
-      setUserId(user.id)
-      setEmail(user.email || "")
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .maybeSingle()
-
-      if (!profile) {
-        await supabase.from("profiles").insert({
-          id: user.id,
-          email: user.email || "",
-          full_name: "",
-          plan: "free",
-        })
-
-        setName("")
-        setPlan("free")
-        setCreatedAt(user.created_at || null)
-      } else {
-        setName(profile.full_name || "")
-        setPlan(profile.plan || "free")
-        setCreatedAt(profile.created_at || user.created_at || null)
-      }
-
-      const { count: chats } = await supabase
-        .from("chats")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-
-      const { count: messages } = await supabase
-        .from("chat_messages")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-
-      const { count: images } = await supabase
-        .from("image_generations")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-
-      const { count: videos } = await supabase
-        .from("video_generations")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-
-      setChatsCount(chats || 0)
-      setMessagesCount(messages || 0)
-      setImagesCount(images || 0)
-      setVideosCount(videos || 0)
-
-      setIsLoading(false)
     }
 
-    loadProfile()
-  }, [router])
+    loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router, loadAttempt]);
 
   const handleSave = async () => {
-    if (!userId || isSaving) return
+    if (!userId || isSaving) return;
 
-    const supabase = createClient()
+    const supabase = createClient();
 
-    setIsSaving(true)
-    setSuccessMessage("")
-    setErrorMessage("")
+    setIsSaving(true);
+    setSuccessMessage("");
+    setErrorMessage("");
 
     const { error } = await supabase
       .from("profiles")
@@ -153,37 +219,55 @@ export default function ProfilePage() {
         full_name: name.trim(),
         updated_at: new Date().toISOString(),
       })
-      .eq("id", userId)
+      .eq("id", userId);
 
-    setIsSaving(false)
+    setIsSaving(false);
 
     if (error) {
-      setErrorMessage("Не получилось сохранить профиль.")
-      return
+      setErrorMessage("Не получилось сохранить профиль.");
+      return;
     }
 
-    setSuccessMessage("Профиль сохранён.")
-    window.dispatchEvent(new Event("nexusai-chats-updated"))
-  }
+    setSuccessMessage("Профиль сохранён.");
+    window.dispatchEvent(new Event("nexusai-chats-updated"));
+  };
 
   const handleSignOut = async () => {
-    const supabase = createClient()
+    const supabase = createClient();
 
-    await supabase.auth.signOut()
+    await supabase.auth.signOut();
 
-    window.localStorage.removeItem("nexusai_active_chat_id")
-    window.location.href = "/sign-in"
-  }
+    window.localStorage.removeItem("nexusai_active_chat_id");
+    window.location.href = "/sign-in";
+  };
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-6">
+      <div className="flex min-h-[calc(100vh-8rem)] items-center justify-center p-6">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin text-primary" />
           Загружаем профиль...
         </div>
       </div>
-    )
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex min-h-[calc(100vh-8rem)] items-center justify-center p-6">
+        <Card className="w-full max-w-md border-border bg-card">
+          <CardHeader>
+            <CardTitle>Не удалось загрузить профиль</CardTitle>
+            <CardDescription>{loadError}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => setLoadAttempt((value) => value + 1)}>
+              Попробовать снова
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -360,5 +444,5 @@ export default function ProfilePage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
