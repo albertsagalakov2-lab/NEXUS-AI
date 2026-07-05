@@ -108,7 +108,7 @@ function sanitizeFileName(value: string) {
   return safe || `reference-${Date.now()}.png`
 }
 
-async function uploadReference(reference: ReferenceFile) {
+export async function uploadReference(reference: ReferenceFile) {
   const response = await fetch(
     `${getKieUploadBaseUrl()}/api/file-base64-upload`,
     {
@@ -351,19 +351,80 @@ async function waitForResult(taskId: string) {
   )
 }
 
-export async function generateImage(
+export type CreatedImageTask = {
+  taskId: string
+  providerModel: string
+}
+
+export type ImageTaskStatus =
+  | { status: "processing" }
+  | { status: "completed"; url: string }
+  | { status: "failed"; error: string }
+
+export async function createImageTask(
   input: GenerateImageInput
-): Promise<GeneratedImage> {
+): Promise<CreatedImageTask> {
   const referenceUrl = input.reference
     ? await uploadReference(input.reference)
     : null
 
   const task = buildKieTask(input, referenceUrl)
   const taskId = await createTask(task)
-  const resultUrl = await waitForResult(taskId)
+
+  return {
+    taskId,
+    providerModel: task.model,
+  }
+}
+
+export async function getImageTaskStatus(
+  taskId: string
+): Promise<ImageTaskStatus> {
+  const body = await getTaskDetails(taskId)
+  const data = isObject(body) && isObject(body.data) ? body.data : null
+
+  if (!data) {
+    return {
+      status: "failed",
+      error: getErrorMessage(body) || "Kie.ai вернул пустой статус",
+    }
+  }
+
+  const state =
+    typeof data.state === "string" ? data.state.toLowerCase() : ""
+
+  if (state === "success") {
+    const resultUrl = findResultUrl(data.resultJson ?? data.result)
+    if (!resultUrl) {
+      return {
+        status: "failed",
+        error: "Kie.ai завершил задачу, но не вернул ссылку на изображение",
+      }
+    }
+
+    return { status: "completed", url: resultUrl }
+  }
+
+  if (state === "fail" || state === "failed" || state === "error") {
+    return {
+      status: "failed",
+      error:
+        getErrorMessage(data) ||
+        "Генерация изображения в Kie.ai завершилась ошибкой",
+    }
+  }
+
+  return { status: "processing" }
+}
+
+export async function generateImage(
+  input: GenerateImageInput
+): Promise<GeneratedImage> {
+  const task = await createImageTask(input)
+  const resultUrl = await waitForResult(task.taskId)
 
   return {
     url: resultUrl,
-    providerModel: task.model,
+    providerModel: task.providerModel,
   }
 }

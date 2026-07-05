@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -55,7 +56,7 @@ type ImageGeneration = {
   style: string | null
   aspect_ratio: string | null
   image_url: string | null
-  status: string
+  status: "processing" | "completed" | "failed" | string
   created_at: string
 }
 
@@ -144,16 +145,8 @@ function formatDate(value: string) {
   }).format(new Date(value))
 }
 
-function getGenerationWidthClass(aspectRatio?: string | null) {
-  if (["9:16", "3:4", "2:3"].includes(aspectRatio || "")) {
-    return "max-w-[460px] sm:max-w-[500px]"
-  }
-
-  if (["16:9", "4:3", "3:2"].includes(aspectRatio || "")) {
-    return "max-w-[760px]"
-  }
-
-  return "max-w-[580px]"
+function isPublicImageUrl(value?: string | null) {
+  return Boolean(value && /^https?:\/\//i.test(value))
 }
 
 async function fetchJson(url: string, options?: RequestInit) {
@@ -227,23 +220,20 @@ export default function ImageGenerationPage() {
 
   const [images, setImages] = useState<ImageGeneration[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isGenerating, setIsGenerating] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [deletingId, setDeletingId] = useState("")
   const [error, setError] = useState("")
   const [modelDialogOpen, setModelDialogOpen] = useState(false)
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false)
 
-  const [pendingPrompt, setPendingPrompt] = useState("")
-  const [pendingModelId, setPendingModelId] = useState<ImageModelId>("gpt-image-2")
-  const [pendingReferenceName, setPendingReferenceName] = useState("")
-
-  const desktopFileRef = useRef<HTMLInputElement | null>(null)
-  const mobileFileRef = useRef<HTMLInputElement | null>(null)
-  const messagesEndRef = useRef<HTMLDivElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const requestInFlightRef = useRef(false)
 
   const selectedModel = useMemo(() => getModel(modelId), [modelId])
-  const chronologicalImages = useMemo(() => [...images].reverse(), [images])
-  const hasConversation = chronologicalImages.length > 0 || isGenerating
+  const pendingCount = useMemo(
+    () => images.filter((image) => image.status === "processing").length,
+    [images]
+  )
 
   useEffect(() => {
     if (!referenceFile) {
@@ -253,36 +243,39 @@ export default function ImageGenerationPage() {
 
     const url = URL.createObjectURL(referenceFile)
     setPreviewUrl(url)
-
     return () => URL.revokeObjectURL(url)
   }, [referenceFile])
 
-  useEffect(() => {
-    if (!hasConversation) return
+  const loadImages = useCallback(async (silent = false) => {
+    if (requestInFlightRef.current) return
+    requestInFlightRef.current = true
 
-    const timeout = window.setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
-    }, 80)
-
-    return () => window.clearTimeout(timeout)
-  }, [chronologicalImages.length, hasConversation, isGenerating])
-
-  const loadImages = async () => {
     try {
-      setError("")
+      if (!silent) setError("")
       const data = await fetchJson("/api/images", { cache: "no-store" })
       setImages(data.images || [])
     } catch (loadError) {
       console.error("Load images error:", loadError)
-      setError("Не получилось загрузить историю изображений.")
+      if (!silent) setError("Не получилось загрузить историю изображений.")
     } finally {
-      setIsLoading(false)
+      requestInFlightRef.current = false
+      if (!silent) setIsLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    loadImages()
-  }, [])
+    loadImages(false)
+  }, [loadImages])
+
+  useEffect(() => {
+    if (pendingCount === 0) return
+
+    const timer = window.setInterval(() => {
+      loadImages(true)
+    }, 3500)
+
+    return () => window.clearInterval(timer)
+  }, [loadImages, pendingCount])
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -306,23 +299,16 @@ export default function ImageGenerationPage() {
 
   const handleGenerate = async () => {
     const currentPrompt = prompt.trim()
-    if (!currentPrompt || isGenerating) return
+    if (!currentPrompt || isSubmitting) return
 
     const currentFile = referenceFile
-    const currentModel = modelId
-
-    setIsGenerating(true)
+    setIsSubmitting(true)
     setError("")
-    setPendingPrompt(currentPrompt)
-    setPendingModelId(currentModel)
-    setPendingReferenceName(currentFile?.name || "")
-    setPrompt("")
-    setReferenceFile(null)
 
     try {
       const body = new FormData()
       body.append("prompt", currentPrompt)
-      body.append("model", currentModel)
+      body.append("model", modelId)
       body.append("aspect_ratio", aspectRatio)
       body.append("image_size", imageSize)
 
@@ -338,28 +324,25 @@ export default function ImageGenerationPage() {
         body,
       })
 
-      setImages((current) => [data.image as ImageGeneration, ...current])
-      setPendingPrompt("")
-      setPendingReferenceName("")
+      const created = data.image as ImageGeneration
+      setImages((current) => [created, ...current.filter((item) => item.id !== created.id)])
+      setPrompt("")
+      setReferenceFile(null)
     } catch (generateError) {
       console.error("Generate image error:", generateError)
-      setPrompt(currentPrompt)
-      setReferenceFile(currentFile)
-      setPendingPrompt("")
-      setPendingReferenceName("")
       setError(
         generateError instanceof Error
           ? generateError.message
-          : "Не получилось создать изображение."
+          : "Не получилось запустить генерацию изображения."
       )
     } finally {
-      setIsGenerating(false)
+      setIsSubmitting(false)
     }
   }
 
   const handleDelete = async (id: string) => {
     if (deletingId) return
-    if (!window.confirm("Удалить эту генерацию из чата?")) return
+    if (!window.confirm("Удалить эту генерацию?")) return
 
     setDeletingId(id)
     setError("")
@@ -375,13 +358,11 @@ export default function ImageGenerationPage() {
     }
   }
 
-  const renderComposer = () => (
-    <div className="rounded-[26px] border border-white/[0.10] bg-[#0a0f1d]/88 p-3 shadow-[0_24px_80px_rgba(0,0,0,0.42)] backdrop-blur-2xl sm:p-4">
+  const composer = (
+    <div className="w-full rounded-[24px] border border-white/[0.10] bg-[#0a0f1d]/92 p-3 shadow-[0_22px_70px_rgba(0,0,0,0.34)] backdrop-blur-xl sm:p-4">
       <Textarea
         value={prompt}
-        onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
-          setPrompt(event.target.value)
-        }
+        onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setPrompt(event.target.value)}
         onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => {
           if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault()
@@ -389,39 +370,28 @@ export default function ImageGenerationPage() {
           }
         }}
         placeholder="Опишите изображение..."
-        className={cn(
-          "resize-none border-0 bg-transparent px-2 py-2 text-base text-white shadow-none placeholder:text-slate-600 focus-visible:ring-0",
-          hasConversation ? "min-h-[86px]" : "min-h-[112px] sm:min-h-[130px]"
-        )}
+        className="min-h-[92px] resize-none border-0 bg-transparent px-2 py-2 text-base text-white shadow-none placeholder:text-slate-600 focus-visible:ring-0 sm:min-h-[108px]"
       />
 
       {referenceFile && (
         <div className="mx-1 mb-3 flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-2.5">
           <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-black/30">
             {referenceFile.type.startsWith("image/") && previewUrl ? (
-              <img
-                src={previewUrl}
-                alt="Предпросмотр"
-                className="h-full w-full object-cover"
-              />
+              <img src={previewUrl} alt="Предпросмотр" className="h-full w-full object-cover" />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-blue-300">
                 <FileVideo className="h-5 w-5" />
               </div>
             )}
           </div>
-
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-slate-200">
-              {referenceFile.name}
-            </p>
+            <p className="truncate text-sm font-medium text-slate-200">{referenceFile.name}</p>
             <p className="mt-0.5 text-xs text-slate-500">
               {referenceFile.type.startsWith("video/")
                 ? "Видео-референс · используем кадр из видео"
                 : "Изображение-референс"}
             </p>
           </div>
-
           <button
             type="button"
             onClick={() => setReferenceFile(null)}
@@ -433,43 +403,26 @@ export default function ImageGenerationPage() {
         </div>
       )}
 
-      <div className="flex items-center gap-2">
-        <div className="hidden sm:block">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => desktopFileRef.current?.click()}
-            className="h-11 w-11 rounded-xl border border-white/[0.07] bg-white/[0.035] text-slate-300 hover:bg-white/[0.07] hover:text-white"
-            title="Прикрепить фото или видео"
-          >
-            <Paperclip className="h-5 w-5" />
-          </Button>
-        </div>
-
-        <div className="sm:hidden">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => mobileFileRef.current?.click()}
-            className="h-11 w-11 rounded-xl border border-white/[0.07] bg-white/[0.035] text-slate-300 hover:bg-white/[0.07] hover:text-white"
-            title="Добавить фото или видео"
-            aria-label="Добавить фото или видео"
-          >
-            <Plus className="h-5 w-5" />
-          </Button>
-        </div>
+      <div className="flex min-w-0 items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => fileInputRef.current?.click()}
+          className="h-11 w-11 shrink-0 rounded-xl border border-white/[0.07] bg-white/[0.035] text-slate-300 hover:bg-white/[0.07] hover:text-white"
+          title="Прикрепить фото или видео"
+        >
+          <Paperclip className="hidden h-5 w-5 sm:block" />
+          <Plus className="h-5 w-5 sm:hidden" />
+        </Button>
 
         <button
           type="button"
           onClick={() => setModelDialogOpen(true)}
-          className="flex h-11 min-w-0 items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.035] px-3 text-sm text-slate-200 transition hover:bg-white/[0.07]"
+          className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.035] px-3 text-sm text-slate-200 transition hover:bg-white/[0.07] sm:flex-none"
         >
           <ModelIcon model={selectedModel} className="h-7 w-7 rounded-lg text-base" />
-          <span className="max-w-[150px] truncate font-medium sm:max-w-none">
-            {selectedModel.label}
-          </span>
+          <span className="truncate font-medium sm:max-w-[170px]">{selectedModel.label}</span>
           <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
         </button>
 
@@ -480,9 +433,7 @@ export default function ImageGenerationPage() {
             </SelectTrigger>
             <SelectContent>
               {ASPECT_RATIOS.map((ratio) => (
-                <SelectItem key={ratio} value={ratio}>
-                  {ratio}
-                </SelectItem>
+                <SelectItem key={ratio} value={ratio}>{ratio}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -493,9 +444,7 @@ export default function ImageGenerationPage() {
             </SelectTrigger>
             <SelectContent>
               {IMAGE_SIZES.map((size) => (
-                <SelectItem key={size} value={size}>
-                  {size}
-                </SelectItem>
+                <SelectItem key={size} value={size}>{size}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -506,7 +455,8 @@ export default function ImageGenerationPage() {
           variant="ghost"
           size="icon"
           onClick={() => setSettingsDialogOpen(true)}
-          className="ml-auto h-11 w-11 rounded-xl border border-white/[0.07] bg-white/[0.035] text-slate-300 hover:bg-white/[0.07] hover:text-white md:hidden"
+          className="h-11 w-11 shrink-0 rounded-xl border border-white/[0.07] bg-white/[0.035] text-slate-300 hover:bg-white/[0.07] hover:text-white md:hidden"
+          aria-label="Параметры"
         >
           <Settings2 className="h-5 w-5" />
         </Button>
@@ -515,224 +465,185 @@ export default function ImageGenerationPage() {
           type="button"
           size="icon"
           onClick={handleGenerate}
-          disabled={!prompt.trim() || isGenerating}
+          disabled={!prompt.trim() || isSubmitting}
           className="h-11 w-11 shrink-0 rounded-full bg-gradient-to-br from-blue-500 via-violet-500 to-fuchsia-500 text-white shadow-[0_0_28px_rgba(124,58,237,0.28)] hover:opacity-90 disabled:opacity-35"
           aria-label="Создать изображение"
         >
-          {isGenerating ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : (
-            <ArrowUp className="h-5 w-5" />
-          )}
+          {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowUp className="h-5 w-5" />}
         </Button>
       </div>
     </div>
   )
 
   return (
-    <div className="relative min-h-[calc(100dvh-64px)] overflow-x-hidden bg-[#040718] px-4 pb-28 pt-5 sm:px-6 lg:min-h-screen lg:px-8 lg:pb-8 lg:pt-8">
+    <div className="relative min-h-[calc(100dvh-64px)] overflow-x-hidden bg-[#040718] px-4 pb-28 pt-5 sm:px-6 lg:min-h-screen lg:px-8 lg:pb-10 lg:pt-8">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_50%_-10%,rgba(74,67,255,0.10),transparent_34rem),radial-gradient(circle_at_85%_12%,rgba(14,165,233,0.06),transparent_28rem)]" />
+
       <input
-        ref={desktopFileRef}
-        type="file"
-        accept="image/*,video/*"
-        className="hidden"
-        onChange={handleFileChange}
-      />
-      <input
-        ref={mobileFileRef}
+        ref={fileInputRef}
         type="file"
         accept="image/*,video/*"
         className="hidden"
         onChange={handleFileChange}
       />
 
-      <div className="relative mx-auto flex min-h-[calc(100svh-120px)] w-full max-w-[980px] flex-col">
+      <main className="mx-auto w-full max-w-[1120px]">
         {error && (
           <div className="mb-4 rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
             {error}
           </div>
         )}
 
-        {isLoading ? (
-          <div className="flex flex-1 items-center justify-center">
-            <Loader2 className="h-7 w-7 animate-spin text-violet-400" />
+        <section className="mx-auto w-full max-w-4xl pt-2 sm:pt-4">
+          <div className="mb-6 text-center sm:mb-8">
+            <h1 className="text-2xl font-semibold tracking-[-0.03em] text-white sm:text-3xl">
+              Создание изображений
+            </h1>
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">
+              Опишите идею, выберите модель и получите результат. Незавершённые задачи сохраняются даже после обновления страницы.
+            </p>
           </div>
-        ) : !hasConversation ? (
-          <section className="relative flex flex-1 flex-col justify-center py-8 lg:py-12">
-            <div className="pointer-events-none absolute left-1/2 top-1/2 h-[480px] w-[720px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(91,75,255,0.10),transparent_68%)] blur-2xl" />
+          {composer}
+          <p className="mt-3 text-center text-[11px] text-slate-600">
+            Фото или короткое видео до 4 МБ · Enter для запуска
+          </p>
+        </section>
 
-            <div className="relative mx-auto w-full max-w-3xl">
-              <div className="mb-8 text-center sm:mb-10">
-                <div className="mb-5 flex justify-center">
-                  <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.035] text-violet-300 shadow-[0_0_40px_rgba(124,58,237,0.14)]">
-                    <ImageIcon className="h-7 w-7" />
-                  </span>
-                </div>
-
-                <h1 className="text-balance text-3xl font-semibold tracking-[-0.035em] text-white sm:text-4xl">
-                  Начните создавать с{" "}
-                  <span className="bg-gradient-to-r from-blue-400 via-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
-                    {selectedModel.label}
-                  </span>
-                </h1>
-
-                <p className="mx-auto mt-4 max-w-xl text-pretty text-sm leading-6 text-slate-400 sm:text-base">
-                  Опишите сцену, персонажа, настроение или стиль — результат появится прямо в этом чате.
-                </p>
-              </div>
-
-              {renderComposer()}
-
-              <p className="mt-3 text-center text-[11px] text-slate-600">
-                Фото или короткое видео до 4 МБ · Enter для запуска
+        <section className="mt-10 sm:mt-12">
+          <div className="mb-4 flex items-end justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-white sm:text-xl">История генераций</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                {pendingCount > 0
+                  ? `В процессе: ${pendingCount}. Статус обновляется автоматически.`
+                  : "Все созданные изображения хранятся здесь."}
               </p>
             </div>
-          </section>
-        ) : (
-          <>
-            <section className="flex-1 pb-6 pt-4 sm:pb-8 sm:pt-7">
-              <div className="space-y-10 sm:space-y-12">
-                {chronologicalImages.map((image) => {
-                  const imageModel = getModel(image.style)
+            {images.length > 0 && (
+              <span className="shrink-0 rounded-full border border-white/[0.08] bg-white/[0.035] px-3 py-1 text-xs text-slate-400">
+                {images.length}
+              </span>
+            )}
+          </div>
 
-                  return (
-                    <div key={image.id} className="space-y-3">
-                      <div className="flex justify-end">
-                        <div className="max-w-[88%] rounded-[22px] rounded-br-md border border-blue-300/10 bg-gradient-to-br from-blue-600/85 to-violet-600/85 px-4 py-3 text-sm leading-6 text-white shadow-[0_14px_40px_rgba(37,99,235,0.14)] sm:max-w-[70%]">
-                          {image.prompt}
-                        </div>
-                      </div>
-
-                      <div className="flex justify-start sm:pl-2">
-                        <article
-                          className={cn(
-                            "w-full overflow-hidden rounded-[26px] border border-white/[0.08] bg-[#090e1b]/92 shadow-[0_22px_70px_rgba(0,0,0,0.34)]",
-                            getGenerationWidthClass(image.aspect_ratio)
-                          )}
-                        >
-                          <div className="flex items-center gap-3 border-b border-white/[0.07] px-4 py-3">
-                            <ModelIcon model={imageModel} className="h-8 w-8 rounded-lg text-base" />
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium text-slate-100">
-                                {imageModel.label}
-                              </p>
-                              <p className="text-[11px] text-slate-600">
-                                {formatDate(image.created_at)}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="relative flex items-center justify-center bg-[#060a14] p-2.5 sm:p-3">
-                            {image.image_url ? (
-                              <img
-                                src={image.image_url}
-                                alt={image.prompt}
-                                className="max-h-[560px] w-auto max-w-full rounded-[18px] object-contain"
-                              />
-                            ) : (
-                              <div className="flex aspect-square items-center justify-center">
-                                <ImageIcon className="h-9 w-9 text-slate-700" />
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex items-center justify-between gap-3 px-4 py-3">
-                            <p className="line-clamp-1 min-w-0 flex-1 text-xs text-slate-500">
-                              {image.aspect_ratio || "1:1"}
-                            </p>
-
-                            <div className="flex gap-2">
-                              {image.image_url && (
-                                <a
-                                  href={image.image_url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.035] text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
-                                  aria-label="Скачать изображение"
-                                >
-                                  <Download className="h-4 w-4" />
-                                </a>
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={() => handleDelete(image.id)}
-                                disabled={deletingId === image.id}
-                                className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.035] text-slate-400 transition hover:border-red-400/25 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
-                                aria-label="Удалить генерацию"
-                              >
-                                {deletingId === image.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
-                                )}
-                              </button>
-                            </div>
-                          </div>
-                        </article>
-                      </div>
-                    </div>
-                  )
-                })}
-
-                {isGenerating && pendingPrompt && (
-                  <div className="space-y-3">
-                    <div className="flex justify-end">
-                      <div className="max-w-[88%] rounded-[22px] rounded-br-md bg-gradient-to-br from-blue-600/90 to-violet-600/90 px-4 py-3 text-sm leading-6 text-white shadow-[0_12px_36px_rgba(37,99,235,0.15)] sm:max-w-[72%]">
-                        <p>{pendingPrompt}</p>
-                        {pendingReferenceName && (
-                          <p className="mt-2 truncate border-t border-white/15 pt-2 text-xs text-white/65">
-                            Прикреплено: {pendingReferenceName}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex justify-start sm:pl-2">
-                      <div className="w-full max-w-[580px] rounded-[26px] border border-white/[0.08] bg-[#090e1b]/92 p-4 shadow-[0_22px_70px_rgba(0,0,0,0.34)]">
-                        <div className="flex items-center gap-3">
-                          <ModelIcon model={getModel(pendingModelId)} className="h-9 w-9 rounded-lg text-base" />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-slate-100">
-                              {getModel(pendingModelId).label}
-                            </p>
-                            <p className="mt-0.5 text-xs text-slate-500">
-                              Создаю изображение…
-                            </p>
-                          </div>
-                          <Loader2 className="h-5 w-5 animate-spin text-violet-400" />
-                        </div>
-
-                        <div className="mt-4 aspect-[16/9] animate-pulse rounded-2xl bg-gradient-to-br from-white/[0.045] via-violet-500/[0.035] to-blue-500/[0.045]" />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div ref={messagesEndRef} className="h-2" />
-              </div>
-            </section>
-
-            <div className="sticky bottom-[78px] z-20 mt-8 pb-3 lg:bottom-4 lg:mt-10">
-              <div className="relative mx-auto max-w-3xl">
-                <div className="pointer-events-none absolute -inset-x-8 -inset-y-6 -z-10 rounded-[40px] bg-[radial-gradient(circle_at_center,rgba(67,56,202,0.15),transparent_66%)] blur-2xl" />
-                {renderComposer()}
-              </div>
+          {isLoading ? (
+            <div className="flex min-h-[260px] items-center justify-center rounded-[26px] border border-white/[0.07] bg-white/[0.02]">
+              <Loader2 className="h-7 w-7 animate-spin text-violet-400" />
             </div>
-          </>
-        )}
-      </div>
+          ) : images.length === 0 ? (
+            <div className="flex min-h-[250px] flex-col items-center justify-center rounded-[26px] border border-dashed border-white/[0.10] bg-white/[0.018] px-6 text-center">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.03] text-slate-500">
+                <ImageIcon className="h-6 w-6" />
+              </span>
+              <p className="mt-4 font-medium text-slate-300">История пока пустая</p>
+              <p className="mt-1 max-w-sm text-sm leading-6 text-slate-600">
+                После запуска первая задача сразу появится здесь и не исчезнет при обновлении страницы.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              {images.map((image) => {
+                const imageModel = getModel(image.style)
+                const completed = image.status === "completed" && isPublicImageUrl(image.image_url)
+                const processing = image.status === "processing"
+                const failed = image.status === "failed"
+
+                return (
+                  <article
+                    key={image.id}
+                    className="min-w-0 overflow-hidden rounded-[24px] border border-white/[0.08] bg-[#090e1b]/92 shadow-[0_18px_60px_rgba(0,0,0,0.28)]"
+                  >
+                    <div className="flex items-center gap-3 border-b border-white/[0.07] px-4 py-3.5">
+                      <ModelIcon model={imageModel} className="h-8 w-8 rounded-lg text-base" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-slate-100">{imageModel.label}</p>
+                        <p className="mt-0.5 text-[11px] text-slate-600">{formatDate(image.created_at)}</p>
+                      </div>
+                      <span
+                        className={cn(
+                          "rounded-full px-2.5 py-1 text-[11px] font-medium",
+                          processing && "bg-violet-500/10 text-violet-300",
+                          completed && "bg-emerald-500/10 text-emerald-300",
+                          failed && "bg-red-500/10 text-red-300"
+                        )}
+                      >
+                        {processing ? "Создаётся" : completed ? "Готово" : "Ошибка"}
+                      </span>
+                    </div>
+
+                    <div className="border-b border-white/[0.06] px-4 py-3">
+                      <p className="line-clamp-3 text-sm leading-6 text-slate-300">{image.prompt}</p>
+                    </div>
+
+                    <div className="relative flex min-h-[260px] items-center justify-center bg-[#060a14] p-3 sm:min-h-[300px]">
+                      {completed ? (
+                        <img
+                          src={image.image_url || ""}
+                          alt={image.prompt}
+                          className="max-h-[430px] w-full rounded-[18px] object-contain"
+                        />
+                      ) : processing ? (
+                        <div className="flex w-full flex-col items-center justify-center">
+                          <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-400/15 bg-violet-500/[0.06]">
+                            <Loader2 className="h-7 w-7 animate-spin text-violet-400" />
+                            <span className="absolute inset-0 animate-pulse rounded-2xl shadow-[0_0_36px_rgba(124,58,237,0.18)]" />
+                          </div>
+                          <p className="mt-4 text-sm font-medium text-slate-300">Генерация продолжается</p>
+                          <p className="mt-1 text-xs text-slate-600">Можно обновить страницу или вернуться позже</p>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-center">
+                          <ImageIcon className="h-8 w-8 text-red-300/60" />
+                          <p className="mt-3 text-sm text-slate-400">Не удалось создать изображение</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 px-4 py-3">
+                      <p className="min-w-0 flex-1 truncate text-xs text-slate-600">
+                        {image.aspect_ratio || "1:1"}
+                      </p>
+                      <div className="flex gap-2">
+                        {completed && (
+                          <a
+                            href={image.image_url || "#"}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.035] text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
+                            aria-label="Скачать изображение"
+                          >
+                            <Download className="h-4 w-4" />
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(image.id)}
+                          disabled={deletingId === image.id}
+                          className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.035] text-slate-400 transition hover:border-red-400/25 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50"
+                          aria-label="Удалить генерацию"
+                        >
+                          {deletingId === image.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </section>
+      </main>
 
       <Dialog open={modelDialogOpen} onOpenChange={setModelDialogOpen}>
         <DialogContent className="border-white/[0.09] bg-[#11141b] p-0 text-white sm:max-w-lg max-sm:bottom-0 max-sm:left-0 max-sm:top-auto max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[28px]">
           <DialogHeader className="border-b border-white/[0.08] px-5 py-5 text-left">
             <DialogTitle className="text-xl">Выберите модель</DialogTitle>
-            <DialogDescription className="sr-only">
-              Выбор модели генерации изображений
-            </DialogDescription>
+            <DialogDescription className="sr-only">Выбор модели генерации изображений</DialogDescription>
           </DialogHeader>
-
           <div className="space-y-2 p-3 pb-6 sm:p-4">
             {MODELS.map((model) => {
               const selected = model.id === modelId
@@ -754,9 +665,7 @@ export default function ImageGenerationPage() {
                   <ModelIcon model={model} />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-white">{model.label}</p>
-                    <p className="mt-0.5 text-sm text-slate-500">
-                      {model.description}
-                    </p>
+                    <p className="mt-0.5 text-sm text-slate-500">{model.description}</p>
                   </div>
                   {selected && <Check className="h-5 w-5 text-white" />}
                 </button>
@@ -770,11 +679,8 @@ export default function ImageGenerationPage() {
         <DialogContent className="border-white/[0.09] bg-[#11141b] text-white sm:max-w-md max-sm:bottom-0 max-sm:left-0 max-sm:top-auto max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[28px]">
           <DialogHeader className="text-left">
             <DialogTitle>Параметры изображения</DialogTitle>
-            <DialogDescription>
-              Выберите формат и качество результата.
-            </DialogDescription>
+            <DialogDescription>Выберите формат и качество результата.</DialogDescription>
           </DialogHeader>
-
           <div className="space-y-5 pt-2">
             <div>
               <p className="mb-2 text-sm font-medium text-slate-200">Формат</p>
@@ -796,11 +702,8 @@ export default function ImageGenerationPage() {
                 ))}
               </div>
             </div>
-
             <div>
-              <p className="mb-2 text-sm font-medium text-slate-200">
-                Разрешение
-              </p>
+              <p className="mb-2 text-sm font-medium text-slate-200">Разрешение</p>
               <div className="grid grid-cols-3 gap-2">
                 {IMAGE_SIZES.map((size) => (
                   <button
@@ -819,7 +722,6 @@ export default function ImageGenerationPage() {
                 ))}
               </div>
             </div>
-
             <Button
               type="button"
               onClick={() => setSettingsDialogOpen(false)}

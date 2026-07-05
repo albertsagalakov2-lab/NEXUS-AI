@@ -2,14 +2,15 @@ import { randomUUID } from "node:crypto"
 import { NextResponse } from "next/server"
 
 import {
-  generateImage,
+  createImageTask,
+  getImageTaskStatus,
   type ImageModelId,
   type ReferenceFile,
 } from "@/lib/image-generation/providers"
 import { createClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
-export const maxDuration = 300
+export const maxDuration = 60
 
 const ALLOWED_MODELS: ImageModelId[] = [
   "nano-banana-pro",
@@ -29,6 +30,18 @@ const ALLOWED_ASPECT_RATIOS = [
 
 const ALLOWED_IMAGE_SIZES = ["1K", "2K", "4K"] as const
 const MAX_REFERENCE_BYTES = 4 * 1024 * 1024
+const TASK_PREFIX = "kie-task:"
+
+type ImageRow = {
+  id: string
+  user_id: string
+  prompt: string
+  style: string | null
+  aspect_ratio: string | null
+  image_url: string | null
+  status: string
+  created_at: string
+}
 
 function isAllowedReferenceType(mimeType: string) {
   return mimeType.startsWith("image/") || mimeType.startsWith("video/")
@@ -39,6 +52,11 @@ function getExtension(mimeType: string) {
   if (mimeType.includes("webp")) return "webp"
   if (mimeType.includes("gif")) return "gif"
   return "png"
+}
+
+function getTaskId(imageUrl: string | null) {
+  if (!imageUrl?.startsWith(TASK_PREFIX)) return null
+  return imageUrl.slice(TASK_PREFIX.length)
 }
 
 async function normalizeGeneratedImage(result: {
@@ -104,11 +122,69 @@ async function persistGeneratedImage(
     if (data.publicUrl) return data.publicUrl
   }
 
-  // Kie.ai хранит результаты временно. Создайте публичный bucket
-  // generated-images в Supabase, чтобы история не теряла изображения.
+  // Если Storage временно недоступен, показываем ссылку Kie.ai.
   if (sourceUrl) return sourceUrl
 
   return `data:${mimeType};base64,${bytes.toString("base64")}`
+}
+
+async function refreshPendingRows(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  rows: ImageRow[]
+) {
+  const pending = rows
+    .filter((row) => row.status === "processing" && getTaskId(row.image_url))
+    .slice(0, 6)
+
+  await Promise.allSettled(
+    pending.map(async (row) => {
+      const taskId = getTaskId(row.image_url)
+      if (!taskId) return
+
+      try {
+        const task = await getImageTaskStatus(taskId)
+
+        if (task.status === "processing") return
+
+        if (task.status === "failed") {
+          await supabase
+            .from("image_generations")
+            .update({ status: "failed", image_url: null })
+            .eq("id", row.id)
+            .eq("user_id", userId)
+            .eq("status", "processing")
+          return
+        }
+
+        const permanentUrl = await persistGeneratedImage(supabase, userId, {
+          url: task.url,
+        })
+
+        await supabase
+          .from("image_generations")
+          .update({ status: "completed", image_url: permanentUrl })
+          .eq("id", row.id)
+          .eq("user_id", userId)
+          .eq("status", "processing")
+      } catch (error) {
+        // Сетевые ошибки не помечаем как окончательный сбой: следующий опрос
+        // повторит проверку задачи Kie.ai.
+        console.error(`Image task refresh failed for ${row.id}:`, error)
+      }
+    })
+  )
+}
+
+async function selectImages(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+) {
+  return supabase
+    .from("image_generations")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
 }
 
 export async function GET() {
@@ -122,17 +198,28 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const { data, error } = await supabase
-    .from("image_generations")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+  const firstQuery = await selectImages(supabase, user.id)
+  if (firstQuery.error) {
+    return NextResponse.json({ error: firstQuery.error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ images: data || [] })
+  const rows = (firstQuery.data || []) as ImageRow[]
+  await refreshPendingRows(supabase, user.id, rows)
+
+  const hasPending = rows.some((row) => row.status === "processing")
+  if (!hasPending) {
+    return NextResponse.json({ images: rows })
+  }
+
+  const refreshedQuery = await selectImages(supabase, user.id)
+  if (refreshedQuery.error) {
+    return NextResponse.json(
+      { error: refreshedQuery.error.message },
+      { status: 500 }
+    )
+  }
+
+  return NextResponse.json({ images: refreshedQuery.data || [] })
 }
 
 export async function POST(request: Request) {
@@ -172,7 +259,7 @@ export async function POST(request: Request) {
 
         if (file.size > MAX_REFERENCE_BYTES) {
           return NextResponse.json(
-            { error: "Файл слишком большой. Максимум 4 МБ для Vercel-запроса." },
+            { error: "Файл слишком большой. Максимум 4 МБ." },
             { status: 400 }
           )
         }
@@ -213,15 +300,13 @@ export async function POST(request: Request) {
       imageSize = "1K"
     }
 
-    const generated = await generateImage({
+    const task = await createImageTask({
       prompt,
       model,
       aspectRatio,
       imageSize,
       reference,
     })
-
-    const imageUrl = await persistGeneratedImage(supabase, user.id, generated)
 
     const { data, error } = await supabase
       .from("image_generations")
@@ -230,8 +315,8 @@ export async function POST(request: Request) {
         prompt,
         style: model,
         aspect_ratio: aspectRatio,
-        image_url: imageUrl,
-        status: "completed",
+        image_url: `${TASK_PREFIX}${task.taskId}`,
+        status: "processing",
       })
       .select("*")
       .single()
@@ -242,7 +327,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       image: data,
-      provider_model: generated.providerModel,
+      task_id: task.taskId,
+      provider_model: task.providerModel,
     })
   } catch (error) {
     console.error("Image generation error:", error)
@@ -252,7 +338,7 @@ export async function POST(request: Request) {
         error:
           error instanceof Error
             ? error.message
-            : "Не получилось создать изображение",
+            : "Не получилось запустить генерацию изображения",
       },
       { status: 500 }
     )
