@@ -307,7 +307,7 @@ export function AppSidebar() {
         <Icon className="h-[18px] w-[18px]" />
         <span>{item.label}</span>
         {item.soon && (
-          <span className="ml-auto text-[9px] uppercase tracking-wider text-slate-600 transition group-hover:text-violet-300">
+          <span className="np-sidebar-soon transition group-hover:text-violet-300">
             скоро
           </span>
         )}
@@ -356,7 +356,7 @@ export function AppSidebar() {
             >
               {thread.title}
             </button>
-            <div className="flex shrink-0 opacity-0 transition group-hover:opacity-100">
+            <div className="flex shrink-0 opacity-100 transition lg:opacity-0 lg:group-hover:opacity-100">
               <button
                 type="button"
                 onClick={() => {
@@ -397,7 +397,7 @@ export function AppSidebar() {
           </Link>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-white">{displayUser}</p>
-            <p className="truncate text-[11px] text-slate-500">{getPlanLabel(userPlan)}</p>
+            <p className="np-sidebar-plan truncate">{getPlanLabel(userPlan)}</p>
           </div>
           <button
             type="button"
@@ -475,30 +475,28 @@ export function AppSidebar() {
         <div className="my-3 h-px bg-white/[0.055]" />
         <div className="space-y-0.5">{creationItems.map((item) => renderMenuItem(item, mobile))}</div>
 
-        {!mobile && (
-          <>
-            <div className="my-3 h-px bg-white/[0.055]" />
+        <>
+          <div className="my-3 h-px bg-white/[0.055]" />
 
-            <button
-              type="button"
-              onClick={toggleRecent}
-              className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-600 hover:text-slate-400"
-            >
-              <span>Недавние чаты</span>
-              {recentCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-            </button>
+          <button
+            type="button"
+            onClick={toggleRecent}
+            className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-600 hover:text-slate-400"
+          >
+            <span>Недавние чаты</span>
+            {recentCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </button>
 
-            {!recentCollapsed && (
-              <div className="mt-1 space-y-0.5">
-                {filteredThreads.length > 0 ? (
-                  filteredThreads.slice(0, 12).map(renderThread)
-                ) : (
-                  <p className="px-2 py-3 text-xs text-slate-600">Чаты не найдены</p>
-                )}
-              </div>
-            )}
-          </>
-        )}
+          {!recentCollapsed && (
+            <div className="mt-1 space-y-0.5 pb-2">
+              {filteredThreads.length > 0 ? (
+                filteredThreads.slice(0, mobile ? 20 : 12).map(renderThread)
+              ) : (
+                <p className="px-2 py-3 text-xs text-slate-600">Чаты не найдены</p>
+              )}
+            </div>
+          )}
+        </>
       </div>
 
       {!mobile && (
@@ -522,7 +520,7 @@ export function AppSidebar() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-medium text-white">{displayUser}</p>
-              <p className="truncate text-[10px] text-slate-600">{getPlanLabel(userPlan)}</p>
+              <p className="np-sidebar-plan truncate">{getPlanLabel(userPlan)}</p>
             </div>
             <button
               type="button"

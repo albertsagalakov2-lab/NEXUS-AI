@@ -470,23 +470,6 @@ function ChatPageContent() {
       {isEmptyChat ? (
         <div className="relative z-[1] flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-8 sm:px-6 lg:py-12">
           <div className="w-full max-w-[760px]">
-            <div className="mb-6 text-center sm:mb-8">
-              <div className="relative mx-auto mb-3 h-[72px] w-[72px] sm:h-[86px] sm:w-[86px]">
-                <Image
-                  src="/neiropeiro-mascot.png"
-                  alt="NeiroPeiro AI"
-                  fill
-                  sizes="86px"
-                  className="object-contain drop-shadow-[0_0_26px_rgba(99,102,241,0.34)]"
-                  priority
-                />
-              </div>
-              <p className="text-sm text-slate-400 sm:text-base">Добро пожаловать в</p>
-              <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-                NeiroPeiro <span className="brand-gradient-text">AI</span>
-              </h1>
-            </div>
-
             {composer}
 
             <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:grid-cols-4 sm:gap-2.5">
