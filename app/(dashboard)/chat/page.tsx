@@ -13,8 +13,6 @@ import {
   Loader2,
   MessageCircleQuestion,
   Paperclip,
-  Plus,
-  RefreshCw,
   Send,
   Sparkles,
   Trash2,
@@ -441,22 +439,6 @@ function ChatPageContent() {
       <div className="pointer-events-none absolute inset-0 neiropeiro-stars" />
 
       <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5 lg:right-5 lg:top-4">
-        <button
-          type="button"
-          onClick={createNewChat}
-          className="np-icon-button hidden lg:flex"
-          title="Новый чат"
-        >
-          <Plus className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={resetCurrentChat}
-          className="np-icon-button"
-          title="Очистить чат"
-        >
-          <RefreshCw className="h-4 w-4" />
-        </button>
         <button
           type="button"
           onClick={deleteCurrentChat}
