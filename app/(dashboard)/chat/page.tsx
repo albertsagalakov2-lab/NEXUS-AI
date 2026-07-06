@@ -612,7 +612,7 @@ function ChatPageContent() {
             </div>
           </div>
 
-          <div className="absolute inset-x-0 bottom-0 z-[2] bg-gradient-to-t from-[#03050a] via-[#03050a]/[0.98] to-transparent px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-8 sm:px-5 sm:pb-4 lg:px-8 lg:pb-4 lg:pt-6">
+          <div className="absolute inset-x-0 bottom-0 z-[2] border-t border-white/[0.04] bg-[#03050a] px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-3 sm:px-5 sm:pb-4 lg:px-8 lg:pb-4 lg:pt-4">
             <div className="mx-auto w-full max-w-[820px]">{composer}</div>
           </div>
         </>

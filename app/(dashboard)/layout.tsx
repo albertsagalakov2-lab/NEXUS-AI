@@ -17,7 +17,7 @@ export default function DashboardLayout({
       <AppearanceProvider />
       <AppSidebar />
 
-      <main className="h-[100dvh] min-h-0 w-full overflow-hidden pt-16 transition-[padding] duration-300 lg:h-auto lg:min-h-screen lg:overflow-visible lg:pl-[var(--np-sidebar-width)] lg:pt-0">
+      <main className="h-[100dvh] min-h-0 w-full overflow-hidden bg-[#03050a] pt-16 transition-[padding] duration-300 lg:h-auto lg:min-h-screen lg:overflow-visible lg:pl-[var(--np-sidebar-width)] lg:pt-0">
         {children}
       </main>
     </div>

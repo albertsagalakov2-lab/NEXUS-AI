@@ -8,6 +8,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#03050a",
+  colorScheme: "dark",
 }
 
 export const metadata: Metadata = {
@@ -39,8 +41,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="ru" className="dark bg-background">
-      <body className="font-sans antialiased">
+    <html lang="ru" className="dark min-h-full bg-[#03050a]">
+      <body className="min-h-[100dvh] overflow-x-hidden bg-[#03050a] font-sans antialiased">
         <AppearanceProvider />
         {children}
         {process.env.NODE_ENV === "production" && <Analytics />}
