@@ -450,7 +450,7 @@ function ChatPageContent() {
 
   if (!isReady) {
     return (
-      <div className="flex h-[calc(100dvh-64px)] items-center justify-center overflow-hidden bg-[#03050a] lg:h-screen">
+      <div className="flex h-full items-center justify-center overflow-hidden bg-[#03050a] lg:h-screen">
         <div className="flex items-center gap-2 text-sm text-slate-500">
           <Sparkles className="h-4 w-4 animate-pulse text-violet-400" />
           Загружаем NeiroPeiro...
@@ -460,7 +460,7 @@ function ChatPageContent() {
   }
 
   return (
-    <div className="neiropeiro-workspace relative flex h-[calc(100dvh-64px)] w-full max-w-[100vw] min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-hidden overscroll-none lg:h-screen">
+    <div className="neiropeiro-workspace relative flex h-full w-full max-w-[100vw] min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-hidden overscroll-none bg-[#03050a] lg:h-screen">
       <div className="pointer-events-none absolute inset-0 neiropeiro-stars" />
 
       {!isGuest && (
@@ -515,7 +515,7 @@ function ChatPageContent() {
         </div>
       ) : (
         <>
-          <div className="relative z-[1] flex-1 overflow-y-auto px-3 pb-5 pt-16 sm:px-5 lg:px-8">
+          <div className="relative z-[1] flex-1 overflow-y-auto overscroll-contain px-3 pb-[190px] pt-16 sm:px-5 sm:pb-[170px] lg:px-8 lg:pb-[150px]">
             <div className="mx-auto w-full max-w-[820px] space-y-6">
               <div className="mb-8 text-center">
                 <p className="truncate text-xs text-slate-600">{chatTitle}</p>
@@ -612,7 +612,7 @@ function ChatPageContent() {
             </div>
           </div>
 
-          <div className="relative z-[2] border-t border-white/[0.05] bg-[#03050a]/82 px-3 py-3 backdrop-blur-xl sm:px-5 lg:px-8 lg:py-4">
+          <div className="absolute inset-x-0 bottom-0 z-[2] bg-gradient-to-t from-[#03050a] via-[#03050a]/[0.98] to-transparent px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-8 sm:px-5 sm:pb-4 lg:px-8 lg:pb-4 lg:pt-6">
             <div className="mx-auto w-full max-w-[820px]">{composer}</div>
           </div>
         </>
@@ -625,7 +625,7 @@ export default function ChatPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex h-[calc(100dvh-64px)] items-center justify-center overflow-hidden bg-[#03050a] lg:h-screen">
+        <div className="flex h-full items-center justify-center overflow-hidden bg-[#03050a] lg:h-screen">
           <div className="text-sm text-slate-500">Загрузка...</div>
         </div>
       }
