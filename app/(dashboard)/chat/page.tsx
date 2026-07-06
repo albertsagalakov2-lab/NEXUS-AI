@@ -20,6 +20,7 @@ import {
   WandSparkles,
 } from "lucide-react"
 
+import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
 type MessageRole = "user" | "assistant"
@@ -117,6 +118,7 @@ function ChatPageContent() {
   const [isReady, setIsReady] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
+  const [isGuest, setIsGuest] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -130,6 +132,21 @@ function ChatPageContent() {
       setIsLoadingMessages(true)
 
       try {
+        const supabase = createClient()
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+
+        if (!user) {
+          if (cancelled) return
+          setIsGuest(true)
+          setActiveChatId("")
+          setChatTitle("Новый чат")
+          setMessages([])
+          return
+        }
+
+        setIsGuest(false)
         const chatsData = await fetchJson("/api/chats")
         const chats: ChatRow[] = chatsData.chats || []
 
@@ -261,7 +278,15 @@ function ChatPageContent() {
   }
 
   const sendMessage = async () => {
-    if (!input.trim() || isLoading || !activeChatId) return
+    if (!input.trim() || isLoading) return
+
+    if (isGuest) {
+      window.sessionStorage.setItem("neiropeiro_guest_prompt", input.trim())
+      router.push("/sign-in?next=/chat")
+      return
+    }
+
+    if (!activeChatId) return
 
     const content = input.trim()
     const nextTitle = chatTitle === "Новый чат" ? createTitleFromMessage(content) : undefined
@@ -372,8 +397,8 @@ function ChatPageContent() {
   }
 
   const composer = (
-    <form onSubmit={handleSubmit} className="w-full">
-      <div className="np-composer">
+    <form onSubmit={handleSubmit} className="w-full min-w-0 max-w-full">
+      <div className="np-composer w-full min-w-0 max-w-full">
         <textarea
           ref={textareaRef}
           value={input}
@@ -382,10 +407,10 @@ function ChatPageContent() {
           placeholder={isEmptyChat ? "Что вы хотите создать?" : "Напишите сообщение..."}
           rows={2}
           disabled={isLoading || isLoadingMessages}
-          className="min-h-[58px] w-full resize-none bg-transparent px-4 pt-3 text-[14px] leading-6 text-white outline-none placeholder:text-slate-600 sm:min-h-[66px] sm:text-[15px]"
+          className="min-h-[58px] w-full min-w-0 max-w-full resize-none bg-transparent px-4 pt-3 text-[16px] leading-6 text-white outline-none placeholder:text-slate-600 sm:min-h-[66px] sm:text-[15px]"
         />
 
-        <div className="flex items-center gap-1.5 px-2 pb-2">
+        <div className="flex min-w-0 max-w-full items-center gap-1.5 overflow-hidden px-2 pb-2">
           <button
             type="button"
             className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-white/[0.055] hover:text-white"
@@ -435,10 +460,11 @@ function ChatPageContent() {
   }
 
   return (
-    <div className="neiropeiro-workspace relative flex h-[calc(100dvh-64px)] min-h-0 flex-col overflow-hidden overscroll-none lg:h-screen">
+    <div className="neiropeiro-workspace relative flex h-[calc(100dvh-64px)] w-full max-w-[100vw] min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-hidden overscroll-none lg:h-screen">
       <div className="pointer-events-none absolute inset-0 neiropeiro-stars" />
 
-      <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5 lg:right-5 lg:top-4">
+      {!isGuest && (
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5 lg:right-5 lg:top-4">
         <button
           type="button"
           onClick={deleteCurrentChat}
@@ -447,11 +473,12 @@ function ChatPageContent() {
         >
           <Trash2 className="h-4 w-4" />
         </button>
-      </div>
+        </div>
+      )}
 
       {isEmptyChat ? (
-        <div className="relative z-[1] flex min-h-0 flex-1 flex-col items-center justify-end overflow-hidden px-4 pb-[calc(env(safe-area-inset-bottom)+24px)] pt-4 sm:px-6 sm:pb-8 lg:justify-center lg:overflow-y-auto lg:py-12">
-          <div className="w-full max-w-[760px]">
+        <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col items-center justify-end overflow-x-hidden overflow-y-hidden px-4 pb-[calc(env(safe-area-inset-bottom)+24px)] pt-4 sm:px-6 sm:pb-8 lg:justify-center lg:overflow-y-auto lg:py-12">
+          <div className="w-full min-w-0 max-w-[min(760px,calc(100vw-32px))]">
             {composer}
 
             <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:grid-cols-4 sm:gap-2.5">
@@ -474,6 +501,12 @@ function ChatPageContent() {
                 </button>
               ))}
             </div>
+
+            {isGuest && (
+              <p className="mt-5 text-center text-[11px] text-slate-600">
+                Вы можете посмотреть сервис без регистрации. Для отправки запроса и сохранения истории потребуется вход.
+              </p>
+            )}
 
             <p className="mt-10 hidden text-center text-[11px] text-slate-700 sm:block">
               Enter — отправить · Shift + Enter — новая строка
