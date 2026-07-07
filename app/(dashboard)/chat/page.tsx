@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { Suspense, useEffect, useRef, useState } from "react"
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowUp,
@@ -18,6 +18,7 @@ import {
   Trash2,
   User,
   WandSparkles,
+  X,
 } from "lucide-react"
 
 import { createClient } from "@/lib/supabase/client"
@@ -44,6 +45,14 @@ interface MessageRow {
   role: MessageRole
   content: string
   created_at: string
+}
+
+interface ChatAttachment {
+  id: string
+  name: string
+  type: string
+  size: number
+  dataUrl: string
 }
 
 const ACTIVE_THREAD_STORAGE_KEY = "nexusai_active_chat_id"
@@ -119,9 +128,15 @@ function ChatPageContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [isGuest, setIsGuest] = useState(false)
+  const [composerHeight, setComposerHeight] = useState(0)
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([])
+  const [attachmentError, setAttachmentError] = useState("")
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesScrollRef = useRef<HTMLDivElement>(null)
+  const composerDockRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const isEmptyChat = messages.length === 0
 
   useEffect(() => {
@@ -196,8 +211,47 @@ function ChatPageContent() {
   }, [chatIdFromUrl, router])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
-  }, [messages, isLoading])
+    const composerDock = composerDockRef.current
+    if (!composerDock) return
+
+    const updateComposerHeight = () => {
+      setComposerHeight(Math.ceil(composerDock.getBoundingClientRect().height))
+    }
+
+    updateComposerHeight()
+
+    const resizeObserver = new ResizeObserver(updateComposerHeight)
+    resizeObserver.observe(composerDock)
+    window.addEventListener("resize", updateComposerHeight)
+
+    return () => {
+      resizeObserver.disconnect()
+      window.removeEventListener("resize", updateComposerHeight)
+    }
+  }, [isEmptyChat])
+
+  useLayoutEffect(() => {
+    const scrollArea = messagesScrollRef.current
+    if (!scrollArea || isEmptyChat) return
+
+    let frameOne = 0
+    let frameTwo = 0
+    const timeoutId = window.setTimeout(() => {
+      scrollArea.scrollTop = scrollArea.scrollHeight
+    }, 120)
+
+    frameOne = window.requestAnimationFrame(() => {
+      frameTwo = window.requestAnimationFrame(() => {
+        scrollArea.scrollTop = scrollArea.scrollHeight
+      })
+    })
+
+    return () => {
+      window.cancelAnimationFrame(frameOne)
+      window.cancelAnimationFrame(frameTwo)
+      window.clearTimeout(timeoutId)
+    }
+  }, [messages, isLoading, composerHeight, isEmptyChat])
 
   const createNewChat = async () => {
     if (isLoading || isLoadingMessages) return
@@ -214,6 +268,8 @@ function ChatPageContent() {
       setChatTitle(chat.title || "Новый чат")
       setMessages([])
       setInput("")
+      setAttachments([])
+      setAttachmentError("")
       window.localStorage.setItem(ACTIVE_THREAD_STORAGE_KEY, chat.id)
       refreshSidebarChats()
       router.push(`/chat?id=${chat.id}`)
@@ -257,6 +313,8 @@ function ChatPageContent() {
       setMessages([])
       setChatTitle("Новый чат")
       setInput("")
+      setAttachments([])
+      setAttachmentError("")
       refreshSidebarChats()
     } catch (error) {
       console.error("Reset chat error:", error)
@@ -277,8 +335,73 @@ function ChatPageContent() {
     return mapMessage(data.message)
   }
 
+  const readFileAsDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result || ""))
+      reader.onerror = () => reject(reader.error || new Error("Не удалось прочитать файл"))
+      reader.readAsDataURL(file)
+    })
+
+  const handleFilesSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(event.target.files || [])
+    event.target.value = ""
+    if (selectedFiles.length === 0) return
+
+    setAttachmentError("")
+    const allowedTypes = new Set([
+      "image/png",
+      "image/jpeg",
+      "image/webp",
+      "image/gif",
+    ])
+    const freeSlots = Math.max(0, 4 - attachments.length)
+    const acceptedFiles = selectedFiles.slice(0, freeSlots)
+
+    if (freeSlots === 0) {
+      setAttachmentError("Можно прикрепить не больше 4 изображений.")
+      return
+    }
+
+    const invalidFile = acceptedFiles.find((file) => !allowedTypes.has(file.type))
+    if (invalidFile) {
+      setAttachmentError("Поддерживаются PNG, JPEG, WEBP и GIF.")
+      return
+    }
+
+    const oversizedFile = acceptedFiles.find((file) => file.size > 5 * 1024 * 1024)
+    if (oversizedFile) {
+      setAttachmentError("Размер одного изображения не должен превышать 5 МБ.")
+      return
+    }
+
+    try {
+      const nextAttachments = await Promise.all(
+        acceptedFiles.map(async (file) => ({
+          id: createTempId(),
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          dataUrl: await readFileAsDataUrl(file),
+        }))
+      )
+      setAttachments((current) => [...current, ...nextAttachments].slice(0, 4))
+      if (selectedFiles.length > freeSlots) {
+        setAttachmentError("Добавлены первые 4 изображения.")
+      }
+    } catch (error) {
+      console.error("Attachment read error:", error)
+      setAttachmentError("Не получилось открыть выбранное изображение.")
+    }
+  }
+
+  const removeAttachment = (attachmentId: string) => {
+    setAttachments((current) => current.filter((attachment) => attachment.id !== attachmentId))
+    setAttachmentError("")
+  }
+
   const sendMessage = async () => {
-    if (!input.trim() || isLoading) return
+    if ((!input.trim() && attachments.length === 0) || isLoading) return
 
     if (isGuest) {
       window.sessionStorage.setItem("neiropeiro_guest_prompt", input.trim())
@@ -288,18 +411,46 @@ function ChatPageContent() {
 
     if (!activeChatId) return
 
-    const content = input.trim()
-    const nextTitle = chatTitle === "Новый чат" ? createTitleFromMessage(content) : undefined
+    const selectedAttachments = [...attachments]
+    const content = input.trim() || "Опиши и проанализируй прикреплённое изображение."
+    const attachmentSummary = selectedAttachments.length
+      ? `\n\n📎 ${selectedAttachments.map((attachment) => attachment.name).join(", ")}`
+      : ""
+    const storedContent = `${content}${attachmentSummary}`
+    const nextTitle =
+      chatTitle === "Новый чат"
+        ? createTitleFromMessage(input.trim() || selectedAttachments[0]?.name || content)
+        : undefined
     const tempUserMessage: Message = {
       id: createTempId(),
       role: "user",
-      content,
+      content: storedContent,
       timestamp: new Date(),
     }
-    const messagesForAi = [...messages, tempUserMessage]
+    const messagesForUi = [...messages, tempUserMessage]
+    const messagesForAi = [
+      ...messages.map((message) => ({
+        role: message.role,
+        content: message.content,
+      })),
+      {
+        role: "user" as const,
+        content: selectedAttachments.length
+          ? [
+              { type: "text" as const, text: content },
+              ...selectedAttachments.map((attachment) => ({
+                type: "image_url" as const,
+                image_url: { url: attachment.dataUrl },
+              })),
+            ]
+          : content,
+      },
+    ]
 
-    setMessages(messagesForAi)
+    setMessages(messagesForUi)
     setInput("")
+    setAttachments([])
+    setAttachmentError("")
     setIsLoading(true)
     if (nextTitle) setChatTitle(nextTitle)
 
@@ -307,7 +458,7 @@ function ChatPageContent() {
       const savedUserMessage = await saveMessageToSupabase(
         activeChatId,
         "user",
-        content,
+        storedContent,
         nextTitle
       )
 
@@ -321,10 +472,7 @@ function ChatPageContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: messagesForAi.map((message) => ({
-            role: message.role,
-            content: message.content,
-          })),
+          messages: messagesForAi,
         }),
       })
 
@@ -398,23 +546,78 @@ function ChatPageContent() {
 
   const composer = (
     <form onSubmit={handleSubmit} className="w-full min-w-0 max-w-full">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        multiple
+        className="sr-only"
+        onChange={handleFilesSelected}
+        aria-label="Выбрать изображения"
+      />
       <div className="np-composer w-full min-w-0 max-w-full">
         <textarea
           ref={textareaRef}
           value={input}
           onChange={(event) => setInput(event.target.value)}
           onKeyDown={handleKeyDown}
+          onFocus={() => {
+            window.setTimeout(() => {
+              const scrollArea = messagesScrollRef.current
+              if (scrollArea && !isEmptyChat) {
+                scrollArea.scrollTop = scrollArea.scrollHeight
+              }
+            }, 280)
+          }}
           placeholder={isEmptyChat ? "Что вы хотите создать?" : "Напишите сообщение..."}
           rows={2}
           disabled={isLoading || isLoadingMessages}
           className="min-h-[58px] w-full min-w-0 max-w-full resize-none bg-transparent px-4 pt-3 text-[16px] leading-6 text-white outline-none placeholder:text-slate-600 sm:min-h-[66px] sm:text-[15px]"
         />
 
+        {attachments.length > 0 && (
+          <div className="flex max-w-full gap-2 overflow-x-auto px-3 pb-2">
+            {attachments.map((attachment) => (
+              <div
+                key={attachment.id}
+                className="relative flex h-14 min-w-[150px] max-w-[210px] items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.035] p-2"
+              >
+                <div
+                  className="h-10 w-10 shrink-0 rounded-lg bg-cover bg-center"
+                  style={{ backgroundImage: `url(${attachment.dataUrl})` }}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[11px] font-medium text-slate-300">
+                    {attachment.name}
+                  </p>
+                  <p className="mt-0.5 text-[9px] text-slate-600">
+                    {(attachment.size / 1024 / 1024).toFixed(1)} МБ
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(attachment.id)}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-600 transition hover:bg-white/[0.06] hover:text-white"
+                  aria-label={`Убрать ${attachment.name}`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {attachmentError && (
+          <p className="px-4 pb-2 text-[10px] text-rose-300">{attachmentError}</p>
+        )}
+
         <div className="flex min-w-0 max-w-full items-center gap-1.5 overflow-hidden px-2 pb-2">
           <button
             type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 hover:bg-white/[0.055] hover:text-white"
-            title="Прикрепить файл"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading || isLoadingMessages}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition hover:bg-white/[0.055] hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+            title="Прикрепить изображение"
           >
             <Paperclip className="h-[18px] w-[18px]" />
           </button>
@@ -431,7 +634,7 @@ function ChatPageContent() {
 
           <button
             type="submit"
-            disabled={!input.trim() || isLoading || isLoadingMessages}
+            disabled={(!input.trim() && attachments.length === 0) || isLoading || isLoadingMessages}
             className="ml-auto flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-blue-500 text-white shadow-[0_7px_20px_rgba(79,70,229,0.38)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-35"
             aria-label="Отправить"
           >
@@ -515,7 +718,15 @@ function ChatPageContent() {
         </div>
       ) : (
         <>
-          <div className="relative z-[1] flex-1 overflow-y-auto overscroll-contain px-3 pb-[190px] pt-16 sm:px-5 sm:pb-[170px] lg:px-8 lg:pb-[150px]">
+          <div
+            ref={messagesScrollRef}
+            className="relative z-[1] min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pt-16 sm:px-5 lg:px-8"
+            style={{
+              paddingBottom: `${Math.max(composerHeight + 28, 196)}px`,
+              scrollPaddingBottom: `${Math.max(composerHeight + 28, 196)}px`,
+              overflowAnchor: "none",
+            }}
+          >
             <div className="mx-auto w-full max-w-[820px] space-y-6">
               <div className="mb-8 text-center">
                 <p className="truncate text-xs text-slate-600">{chatTitle}</p>
@@ -612,7 +823,10 @@ function ChatPageContent() {
             </div>
           </div>
 
-          <div className="absolute inset-x-0 bottom-0 z-[2] border-t border-white/[0.04] bg-[#03050a] px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-3 sm:px-5 sm:pb-4 lg:px-8 lg:pb-4 lg:pt-4">
+          <div
+            ref={composerDockRef}
+            className="absolute inset-x-0 bottom-0 z-[2] border-t border-white/[0.04] bg-[#03050a] px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-3 sm:px-5 sm:pb-4 lg:px-8 lg:pb-4 lg:pt-4"
+          >
             <div className="mx-auto w-full max-w-[820px]">{composer}</div>
           </div>
         </>
