@@ -136,7 +136,6 @@ function ChatPageContent() {
   const messagesScrollRef = useRef<HTMLDivElement>(null)
   const composerDockRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const isEmptyChat = messages.length === 0
 
   useEffect(() => {
@@ -546,15 +545,6 @@ function ChatPageContent() {
 
   const composer = (
     <form onSubmit={handleSubmit} className="w-full min-w-0 max-w-full">
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/png,image/jpeg,image/webp,image/gif"
-        multiple
-        className="sr-only"
-        onChange={handleFilesSelected}
-        aria-label="Выбрать изображения"
-      />
       <div className="np-composer w-full min-w-0 max-w-full">
         <textarea
           ref={textareaRef}
@@ -612,15 +602,27 @@ function ChatPageContent() {
         )}
 
         <div className="flex min-w-0 max-w-full items-center gap-1.5 overflow-hidden px-2 pb-2">
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isLoading || isLoadingMessages}
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 transition hover:bg-white/[0.055] hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+          <label
+            className={cn(
+              "relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl text-slate-500 transition hover:bg-white/[0.055] hover:text-white",
+              (isLoading || isLoadingMessages) &&
+                "pointer-events-none cursor-not-allowed opacity-35"
+            )}
             title="Прикрепить изображение"
+            aria-label="Прикрепить изображение"
+            aria-disabled={isLoading || isLoadingMessages}
           >
-            <Paperclip className="h-[18px] w-[18px]" />
-          </button>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              disabled={isLoading || isLoadingMessages}
+              onChange={handleFilesSelected}
+              className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+              aria-label="Выбрать изображения"
+            />
+            <Paperclip className="pointer-events-none h-[18px] w-[18px]" />
+          </label>
 
           <Link href="/image" className="np-composer-chip">
             <ImageIcon className="h-3.5 w-3.5" />
