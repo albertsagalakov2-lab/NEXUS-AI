@@ -696,10 +696,10 @@ function ChatPageContent() {
                 >
                   <action.icon className="h-[18px] w-[18px] shrink-0 text-blue-400" />
                   <span className="min-w-0 text-left">
-                    <strong className="block truncate text-[12px] font-medium text-slate-200 sm:text-[13px]">
+                    <strong className="block text-[12px] font-medium leading-4 text-slate-200 sm:text-[13px]">
                       {action.label}
                     </strong>
-                    <small className="block truncate text-[10px] text-slate-600 sm:text-[11px]">
+                    <small className="mt-0.5 block text-[10px] leading-3 text-slate-600 sm:text-[11px]">
                       {action.description}
                     </small>
                   </span>

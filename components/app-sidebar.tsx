@@ -97,11 +97,20 @@ export function AppSidebar() {
   const [userEmail, setUserEmail] = useState("");
   const [userName, setUserName] = useState("");
   const [userPlan, setUserPlan] = useState("free");
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState("");
   const [editingThreadId, setEditingThreadId] = useState("");
   const [editingTitle, setEditingTitle] = useState("");
 
-  const displayUser = userName.trim() || userEmail || "Пользователь";
+  const profileName = userName.trim();
+  const emailName = userEmail.split("@")[0] || "";
+  const looksLikeBrokenName =
+    /[РС][\u0400-\u04ff]/.test(profileName) ||
+    (/^[a-z0-9_-]+[\u0400-\u04ff]$/i.test(profileName) && Boolean(emailName));
+  const displayUser =
+    profileName && !looksLikeBrokenName
+      ? profileName
+      : emailName || userEmail || "Пользователь";
 
   const loadChats = useCallback(async () => {
     try {
@@ -116,13 +125,20 @@ export function AppSidebar() {
   }, []);
 
   const loadProfile = useCallback(async () => {
+    setProfileLoaded(false);
     try {
       const supabase = createClient();
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (!user) return;
+      if (!user) {
+        setUserEmail("");
+        setUserName("");
+        setAvatarUrl("");
+        setUserPlan("free");
+        return;
+      }
 
       setUserEmail(user.email || "");
       setAvatarUrl(
@@ -142,6 +158,8 @@ export function AppSidebar() {
       setUserPlan(profile?.plan || "free");
     } catch (error) {
       console.error("Load profile error:", error);
+    } finally {
+      setProfileLoaded(true);
     }
   }, []);
 
@@ -744,7 +762,7 @@ export function AppSidebar() {
         {sidebarContents(false, desktopCollapsed)}
       </aside>
 
-      {!userEmail && (
+      {profileLoaded && !userEmail && (
         <div className="fixed right-6 top-5 z-30 hidden items-center gap-2 lg:flex">
           <Link
             href="/sign-in"
@@ -791,7 +809,7 @@ export function AppSidebar() {
             onClick={() => setMobileOpen(false)}
             className="absolute inset-0 bg-black/72 backdrop-blur-[2px]"
           />
-          <aside className="relative flex h-full w-[86%] max-w-[360px] flex-col border-r border-white/[0.07] bg-[#03050a] shadow-[30px_0_80px_rgba(0,0,0,0.55)]">
+          <aside className="relative flex h-full w-[92vw] min-w-[320px] max-w-[420px] flex-col border-r border-white/[0.07] bg-[#03050a] shadow-[30px_0_80px_rgba(0,0,0,0.55)] max-[360px]:min-w-0">
             {sidebarContents(true)}
           </aside>
         </div>
