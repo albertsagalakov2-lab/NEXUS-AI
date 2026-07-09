@@ -4,31 +4,49 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import {
+  BadgeHelp,
+  Building2,
   Camera,
   Check,
   Coins,
   Crown,
   CreditCard,
+  FolderKanban,
+  Handshake,
   History,
   Image as ImageIcon,
+  LifeBuoy,
   Loader2,
   LogOut,
   Mail,
   MessageSquare,
+  MonitorPlay,
+  MoreHorizontal,
+  Palette,
+  Pencil,
   Save,
   Sparkles,
+  Settings,
   User,
   Video,
   X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
-type AccountSection = "profile" | "pricing" | "tokens";
+type AccountSection =
+  | "profile"
+  | "organization"
+  | "settings"
+  | "appearance"
+  | "media"
+  | "partner"
+  | "support"
+  | "more"
+  | "pricing"
+  | "tokens";
 
 type ProfileRow = {
   full_name: string | null;
@@ -43,6 +61,13 @@ const accountItems: Array<{
   icon: typeof User;
 }> = [
   { id: "profile", label: "Профиль", icon: User },
+  { id: "organization", label: "Организация", icon: Building2 },
+  { id: "settings", label: "Настройки", icon: Settings },
+  { id: "appearance", label: "Внешний вид", icon: Palette },
+  { id: "media", label: "Медиа", icon: MonitorPlay },
+  { id: "partner", label: "Партнёрство", icon: Handshake },
+  { id: "support", label: "Поддержка", icon: LifeBuoy },
+  { id: "more", label: "Ещё", icon: MoreHorizontal },
   { id: "pricing", label: "Тарифы", icon: CreditCard },
   { id: "tokens", label: "История токенов", icon: History },
 ];
@@ -153,9 +178,11 @@ export default function ProfilePage() {
   const [userId, setUserId] = useState("");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [draftName, setDraftName] = useState("");
   const [plan, setPlan] = useState("free");
   const [createdAt, setCreatedAt] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [isEditingName, setIsEditingName] = useState(false);
 
   const [chatsCount, setChatsCount] = useState(0);
   const [messagesCount, setMessagesCount] = useState(0);
@@ -228,6 +255,7 @@ export default function ProfilePage() {
           });
         } else if (!cancelled) {
           setName(profile.full_name || "");
+          setDraftName(profile.full_name || "");
           setPlan(profile.plan || "free");
           setCreatedAt(profile.created_at || user.created_at || null);
         }
@@ -284,7 +312,7 @@ export default function ProfilePage() {
     };
   }, [router, loadAttempt]);
 
-  const handleSave = async () => {
+  const handleSave = async (nextName = name) => {
     if (!userId || isSaving) return;
 
     const supabase = createClient();
@@ -292,11 +320,13 @@ export default function ProfilePage() {
     setSuccessMessage("");
     setErrorMessage("");
 
+    const normalizedName = nextName.trim();
+
     try {
       const profileUpdate = await supabase
         .from("profiles")
         .update({
-          full_name: name.trim(),
+          full_name: normalizedName,
           updated_at: new Date().toISOString(),
         })
         .eq("id", userId);
@@ -304,11 +334,14 @@ export default function ProfilePage() {
       if (profileUpdate.error) throw profileUpdate.error;
 
       const authUpdate = await supabase.auth.updateUser({
-        data: { full_name: name.trim() },
+        data: { full_name: normalizedName },
       });
 
       if (authUpdate.error) throw authUpdate.error;
 
+      setName(normalizedName);
+      setDraftName(normalizedName);
+      setIsEditingName(false);
       setSuccessMessage("Изменения сохранены.");
       window.dispatchEvent(new Event("neiropeiro-profile-updated"));
     } catch (error) {
@@ -405,15 +438,15 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#03050a] px-4 pb-24 pt-5 text-white [scrollbar-gutter:stable] sm:px-6 lg:h-dvh lg:min-h-0 lg:overflow-y-scroll lg:px-8 lg:pb-10 lg:pt-8">
+    <div className="min-h-screen bg-[#03050a] px-3 pb-24 pt-4 text-white [scrollbar-gutter:stable] sm:px-6 lg:h-dvh lg:min-h-0 lg:overflow-y-scroll lg:px-8 lg:pb-10 lg:pt-8">
       <div className="mx-auto w-full max-w-6xl">
-        <div className="mb-5 flex min-h-[58px] items-center justify-between lg:mb-7">
+        <div className="mb-4 flex min-h-[52px] items-center justify-between gap-3 lg:mb-7">
           <div>
-            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-violet-300/80">
+            <p className="hidden text-[11px] font-medium uppercase tracking-[0.18em] text-violet-300/80 sm:block">
               Аккаунт
             </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
-              Настройки профиля
+            <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-3xl">
+              Профиль
             </h1>
           </div>
           <Link
@@ -425,7 +458,7 @@ export default function ProfilePage() {
           </Link>
         </div>
 
-        <div className="mb-5 flex gap-2 overflow-x-auto pb-1 lg:hidden">
+        <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl border border-white/[0.07] bg-[#070a12] p-2 lg:hidden">
           {accountItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -434,7 +467,7 @@ export default function ProfilePage() {
                 type="button"
                 onClick={() => setActiveSection(item.id)}
                 className={cn(
-                  "flex h-10 shrink-0 items-center gap-2 rounded-xl border px-3 text-sm transition",
+                  "flex h-10 min-w-0 items-center gap-2 rounded-xl border px-3 text-left text-xs transition",
                   activeSection === item.id
                     ? "border-violet-400/35 bg-violet-500/12 text-white"
                     : "border-white/[0.07] bg-white/[0.025] text-slate-400",
@@ -486,10 +519,10 @@ export default function ProfilePage() {
 
           <main className="min-h-[620px] min-w-0 w-full">
             {activeSection === "profile" && (
-              <div className="min-h-[620px] w-full space-y-5">
-                <section className="rounded-2xl border border-white/[0.075] bg-[#070a12] p-4 sm:p-5">
-                  <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-                    <div className="relative h-24 w-24 shrink-0">
+              <div className="min-h-[620px] w-full space-y-4 sm:space-y-5">
+                <section className="rounded-2xl border border-white/[0.075] bg-[#070a12] p-3.5 sm:p-5">
+                  <div className="flex items-center gap-3 sm:gap-5">
+                    <div className="relative h-16 w-16 shrink-0 sm:h-24 sm:w-24">
                       <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-400 via-violet-500 to-fuchsia-500 text-3xl font-semibold text-white ring-4 ring-white/[0.035]">
                         {avatarUrl ? (
                           <img
@@ -524,13 +557,118 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <h2 className="truncate text-xl font-semibold">
-                        {displayName}
-                      </h2>
+                      {isEditingName && (
+                        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+                          <input
+                            value={draftName}
+                            onChange={(event) => setDraftName(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") handleSave(draftName);
+                              if (event.key === "Escape") {
+                                setDraftName(name);
+                                setIsEditingName(false);
+                              }
+                            }}
+                            placeholder="Введите имя"
+                            className="h-10 min-w-0 flex-1 rounded-xl border border-white/[0.1] bg-white/[0.035] px-3 text-sm font-semibold text-white outline-none transition placeholder:text-slate-600 focus:border-violet-400/45 sm:text-base"
+                            autoFocus
+                          />
+                          <div className="flex shrink-0 items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleSave(draftName)}
+                              disabled={isSaving}
+                              className="inline-flex h-9 flex-1 items-center justify-center rounded-full bg-white px-3 text-xs font-medium text-black transition hover:bg-slate-200 disabled:cursor-wait disabled:opacity-70 sm:h-10 sm:flex-none sm:px-4 sm:text-sm"
+                            >
+                              {isSaving ? "Сохраняем..." : "Сохранить"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDraftName(name);
+                                setIsEditingName(false);
+                                setSuccessMessage("");
+                                setErrorMessage("");
+                              }}
+                              className="inline-flex h-9 flex-1 items-center justify-center rounded-full border border-white/[0.16] px-3 text-xs font-medium text-white transition hover:bg-white/[0.06] sm:h-10 sm:flex-none sm:px-4 sm:text-sm"
+                            >
+                              Отмена
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      <div className={cn("min-w-0 items-center gap-2", isEditingName ? "hidden" : "flex")}>
+                          <h2 className="truncate text-lg font-semibold sm:text-xl">
+                          {displayName}
+                        </h2>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDraftName(name);
+                            setIsEditingName(true);
+                            setSuccessMessage("");
+                            setErrorMessage("");
+                          }}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/[0.06] hover:text-white"
+                          aria-label="Изменить имя"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      </div>
                       <p className="mt-1 flex items-center gap-1.5 truncate text-sm text-slate-400">
                         <Mail className="h-4 w-4 shrink-0" />
                         {email}
                       </p>
+                      {false && isEditingName && (
+                        <div className="mt-4 max-w-lg rounded-2xl border border-white/[0.075] bg-white/[0.025] p-3">
+                          <div className="flex flex-col gap-3 sm:flex-row">
+                            <input
+                              value={draftName}
+                              onChange={(event) => setDraftName(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") handleSave(draftName);
+                                if (event.key === "Escape") {
+                                  setDraftName(name);
+                                  setIsEditingName(false);
+                                }
+                              }}
+                              placeholder="Введите имя"
+                              className="h-10 min-w-0 flex-1 rounded-xl border border-white/[0.08] bg-[#0b0f19] px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-violet-400/45"
+                              autoFocus
+                            />
+                            <Button
+                              type="button"
+                              onClick={() => handleSave(draftName)}
+                              disabled={isSaving}
+                              className="h-10 bg-gradient-to-r from-violet-500 to-blue-500"
+                            >
+                              {isSaving ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Save className="mr-2 h-4 w-4" />
+                              )}
+                              Сохранить
+                            </Button>
+                          </div>
+                          {(successMessage || errorMessage) && (
+                            <div
+                              className={cn(
+                                "mt-3 flex items-center gap-2 rounded-xl border px-3 py-2 text-sm",
+                                successMessage
+                                  ? "border-emerald-400/20 bg-emerald-500/8 text-emerald-300"
+                                  : "border-rose-400/20 bg-rose-500/8 text-rose-300",
+                              )}
+                            >
+                              {successMessage ? (
+                                <Check className="h-4 w-4" />
+                              ) : (
+                                <X className="h-4 w-4" />
+                              )}
+                              {successMessage || errorMessage}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-violet-400/20 bg-violet-500/10 px-3 text-xs text-violet-200">
                           <Sparkles className="h-3.5 w-3.5" />
@@ -547,7 +685,7 @@ export default function ProfilePage() {
                       variant="outline"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isUploadingAvatar}
-                      className="border-white/[0.09] bg-white/[0.025]"
+                      className="hidden border-white/[0.09] bg-white/[0.025] sm:inline-flex"
                     >
                       <Camera className="mr-2 h-4 w-4" />
                       Сменить фото
@@ -555,73 +693,88 @@ export default function ProfilePage() {
                   </div>
                 </section>
 
-                <section className="rounded-2xl border border-white/[0.075] bg-[#070a12] p-4 sm:p-5">
-                  <div className="mb-5">
-                    <h2 className="text-base font-semibold">Данные аккаунта</h2>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Имя отображается в меню и внутри сервиса.
+                <section className="grid gap-3 sm:gap-4 lg:grid-cols-2">
+                  <div className="rounded-2xl border border-white/[0.075] bg-[#070a12] p-3.5 sm:p-5">
+                    <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-slate-400">
+                      <CreditCard className="h-4 w-4 text-violet-300" />
+                      Тариф
+                    </div>
+                    <div className="mt-3 text-2xl font-semibold text-white sm:mt-4">
+                      {getPlanLabel(plan)}
+                    </div>
+                    <p className="mt-1 text-sm text-slate-400">
+                      5 запросов в день на базовом плане.
                     </p>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="name" className="text-slate-300">
-                        Имя
-                      </Label>
-                      <Input
-                        id="name"
-                        value={name}
-                        onChange={(event) => setName(event.target.value)}
-                        placeholder="Введите имя"
-                        className="h-11 border-white/[0.08] bg-white/[0.035]"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="text-slate-300">
-                        Email
-                      </Label>
-                      <Input
-                        id="email"
-                        value={email}
-                        disabled
-                        className="h-11 border-white/[0.06] bg-white/[0.02] text-slate-500"
-                      />
-                    </div>
-                  </div>
-
-                  {(successMessage || errorMessage) && (
-                    <div
-                      className={cn(
-                        "mt-4 flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm",
-                        successMessage
-                          ? "border-emerald-400/20 bg-emerald-500/8 text-emerald-300"
-                          : "border-rose-400/20 bg-rose-500/8 text-rose-300",
-                      )}
+                    <Link
+                      href="/pricing"
+                      className="mt-4 flex h-10 items-center justify-center rounded-xl bg-white text-sm font-medium text-black transition hover:bg-slate-200"
                     >
-                      {successMessage ? (
-                        <Check className="h-4 w-4" />
-                      ) : (
-                        <X className="h-4 w-4" />
-                      )}
-                      {successMessage || errorMessage}
-                    </div>
-                  )}
+                      Купить подписку
+                    </Link>
+                  </div>
 
-                  <Button
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="mt-5 bg-gradient-to-r from-violet-500 to-blue-500"
-                  >
-                    {isSaving ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Save className="mr-2 h-4 w-4" />
-                    )}
-                    Сохранить изменения
-                  </Button>
+                  <div className="rounded-2xl border border-white/[0.075] bg-[#070a12] p-3.5 sm:p-5">
+                    <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-slate-400">
+                      <Sparkles className="h-4 w-4 text-violet-300" />
+                      Доп. токены
+                    </div>
+                    <div className="mt-3 text-2xl font-semibold text-white sm:mt-4">0</div>
+                    <p className="mt-1 text-sm text-slate-400">
+                      Доступны после оформления подписки.
+                    </p>
+                    <Link
+                      href="/pricing"
+                      className="mt-4 flex h-10 items-center justify-center rounded-xl bg-white text-sm font-medium text-black transition hover:bg-slate-200"
+                    >
+                      Купить токены
+                    </Link>
+                  </div>
                 </section>
 
-                <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <section className="rounded-2xl border border-white/[0.075] bg-[radial-gradient(circle_at_top_left,rgba(139,92,246,0.22),rgba(255,255,255,0.035)_42%,rgba(7,10,18,0.96)_100%)] p-3.5 shadow-[0_24px_80px_rgba(0,0,0,0.32)] sm:p-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.14em] text-slate-300">
+                        <Handshake className="h-4 w-4 text-violet-200" />
+                        Партнёрская программа
+                      </div>
+                      <h2 className="mt-3 text-base font-semibold text-white">
+                        Реферальная ссылка уже готова
+                      </h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveSection("partner")}
+                      className="inline-flex h-9 items-center justify-center rounded-full bg-white/[0.08] px-4 text-xs font-medium text-white transition hover:bg-white/[0.12]"
+                    >
+                      Кабинет
+                    </button>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-white/[0.07] px-3 py-3 text-sm text-white">
+                    <span className="min-w-0 truncate">
+                      https://neiropeiro.ai/ref/{userId.slice(0, 8) || "profile"}
+                    </span>
+                    <span className="shrink-0 text-xs text-slate-400">копия</span>
+                  </div>
+
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl bg-white/[0.06] p-3">
+                      <p className="text-[11px] uppercase tracking-[0.12em] text-slate-400">
+                        Баланс
+                      </p>
+                      <p className="mt-2 text-base font-semibold text-white">0 ₽</p>
+                    </div>
+                    <div className="rounded-xl bg-white/[0.06] p-3">
+                      <p className="text-[11px] uppercase tracking-[0.12em] text-slate-400">
+                        Бонус
+                      </p>
+                      <p className="mt-2 text-base font-semibold text-white">10%</p>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
                   {[
                     { label: "Чаты", value: chatsCount, icon: MessageSquare },
                     { label: "Сообщения", value: messagesCount, icon: Sparkles },
@@ -632,7 +785,7 @@ export default function ProfilePage() {
                     return (
                       <div
                         key={item.label}
-                        className="rounded-2xl border border-white/[0.07] bg-[#070a12] p-4"
+                        className="rounded-2xl border border-white/[0.07] bg-[#070a12] p-3.5 sm:p-4"
                       >
                         <div className="flex items-center gap-2 text-xs text-slate-500">
                           <Icon className="h-4 w-4 text-violet-300" />
@@ -644,6 +797,253 @@ export default function ProfilePage() {
                       </div>
                     );
                   })}
+                </section>
+              </div>
+            )}
+
+            {activeSection === "organization" && (
+              <div className="min-h-[620px] w-full space-y-5">
+                <section className="rounded-2xl border border-white/[0.075] bg-[#070a12] p-5 sm:p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/12 text-violet-300">
+                      <Building2 className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold">Организация</h2>
+                      <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
+                        Пространство для команды, общих лимитов и совместных проектов. Сейчас аккаунт работает как личный.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                    {[
+                      "Приглашение участников",
+                      "Общие чаты и проекты",
+                      "Роли и доступы",
+                      "Единый баланс команды",
+                    ].map((feature) => (
+                      <div
+                        key={feature}
+                        className="rounded-xl border border-white/[0.065] bg-white/[0.025] px-4 py-3 text-sm text-slate-300"
+                      >
+                        {feature}
+                      </div>
+                    ))}
+                  </div>
+
+                  <Button className="mt-6 bg-gradient-to-r from-violet-500 to-blue-500">
+                    <Building2 className="mr-2 h-4 w-4" />
+                    Создать организацию
+                  </Button>
+                </section>
+              </div>
+            )}
+
+            {activeSection === "settings" && (
+              <div className="min-h-[620px] w-full space-y-5">
+                <section className="rounded-2xl border border-white/[0.075] bg-[#070a12] p-5 sm:p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/12 text-violet-300">
+                      <Settings className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold">Настройки</h2>
+                      <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
+                        Управляйте поведением аккаунта, уведомлениями и рабочими сценариями.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 space-y-3">
+                    {[
+                      ["Автосохранение истории", "Чаты и генерации сохраняются в вашем профиле."],
+                      ["Быстрые действия", "Показывать подсказки для изображений, видео и задач."],
+                      ["Безопасный режим", "Предупреждать перед удалением чатов и файлов."],
+                    ].map(([title, description]) => (
+                      <div
+                        key={title}
+                        className="flex items-center justify-between gap-4 rounded-xl border border-white/[0.065] bg-white/[0.025] px-4 py-3"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-white">{title}</p>
+                          <p className="mt-1 text-xs text-slate-500">{description}</p>
+                        </div>
+                        <span className="h-6 w-11 rounded-full border border-violet-400/25 bg-violet-500/20 p-0.5">
+                          <span className="block h-5 w-5 rounded-full bg-violet-300" />
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {activeSection === "appearance" && (
+              <div className="min-h-[620px] w-full space-y-5">
+                <section className="rounded-2xl border border-white/[0.075] bg-[#070a12] p-5 sm:p-6">
+                  <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/12 text-violet-300">
+                        <Palette className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-semibold">Внешний вид</h2>
+                        <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
+                          Цвета NeiroPeiro остаются основой, а отдельные параметры можно настроить в редакторе.
+                        </p>
+                      </div>
+                    </div>
+                    <Link
+                      href="/profile/appearance"
+                      className="inline-flex h-10 items-center justify-center rounded-xl bg-gradient-to-r from-violet-500 to-blue-500 px-4 text-sm font-medium text-white transition hover:brightness-110"
+                    >
+                      Открыть редактор
+                    </Link>
+                  </div>
+
+                  <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                    {["Космический фон", "Фиолетово-синяя гамма", "Мягкие панели"].map((item) => (
+                      <div
+                        key={item}
+                        className="rounded-xl border border-white/[0.065] bg-white/[0.025] px-4 py-3 text-sm text-slate-300"
+                      >
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {activeSection === "media" && (
+              <div className="min-h-[620px] w-full space-y-5">
+                <section className="rounded-2xl border border-white/[0.075] bg-[#070a12] p-5 sm:p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/12 text-violet-300">
+                      <MonitorPlay className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold">Медиа</h2>
+                      <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
+                        Быстрый доступ к созданным изображениям, видео и будущим аудио-инструментам.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {[
+                      { label: "Изображения", value: imagesCount, href: "/image", icon: ImageIcon },
+                      { label: "Видео", value: videosCount, href: "/video", icon: Video },
+                      { label: "Проекты", value: chatsCount, href: "/chat", icon: FolderKanban },
+                    ].map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={item.label}
+                          href={item.href}
+                          className="rounded-2xl border border-white/[0.07] bg-white/[0.025] p-4 transition hover:border-violet-400/25 hover:bg-white/[0.045]"
+                        >
+                          <div className="flex items-center gap-2 text-sm text-slate-300">
+                            <Icon className="h-4 w-4 text-violet-300" />
+                            {item.label}
+                          </div>
+                          <div className="mt-3 text-2xl font-semibold text-white">{item.value}</div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {activeSection === "partner" && (
+              <div className="min-h-[620px] w-full space-y-5">
+                <section className="rounded-2xl border border-white/[0.075] bg-[#070a12] p-5 sm:p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/12 text-violet-300">
+                      <Handshake className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold">Партнёрство</h2>
+                      <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
+                        Раздел для реферальной программы, промокодов и статистики приглашений.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 rounded-xl border border-dashed border-violet-400/25 bg-violet-500/8 p-4 text-sm text-violet-100">
+                    Партнёрский кабинет готовится. Здесь появятся ссылка, начисления и история выплат.
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {activeSection === "support" && (
+              <div className="min-h-[620px] w-full space-y-5">
+                <section className="rounded-2xl border border-white/[0.075] bg-[#070a12] p-5 sm:p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/12 text-violet-300">
+                      <LifeBuoy className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold">Поддержка</h2>
+                      <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
+                        Помощь по аккаунту, оплате, генерациям и доступу к моделям.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                    {[
+                      { title: "Написать в поддержку", text: "Опишите проблему, мы подготовим обращение." },
+                      { title: "Проверить лимиты", text: "Сверьте тариф, историю и доступные генерации." },
+                      { title: "Вопросы по оплате", text: "Поможем разобраться с тарифом и продлением." },
+                      { title: "Техническая помощь", text: "Если что-то не загрузилось или работает странно." },
+                    ].map((item) => (
+                      <div
+                        key={item.title}
+                        className="rounded-xl border border-white/[0.065] bg-white/[0.025] p-4"
+                      >
+                        <p className="text-sm font-medium text-white">{item.title}</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">{item.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {activeSection === "more" && (
+              <div className="min-h-[620px] w-full space-y-5">
+                <section className="rounded-2xl border border-white/[0.075] bg-[#070a12] p-5 sm:p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/12 text-violet-300">
+                      <BadgeHelp className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold">Ещё</h2>
+                      <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
+                        Дополнительные разделы аккаунта, которые не нужны каждый день, но должны быть под рукой.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                    {[
+                      "Документы и файлы",
+                      "Безопасность входа",
+                      "Экспорт данных",
+                      "История действий",
+                    ].map((item) => (
+                      <div
+                        key={item}
+                        className="rounded-xl border border-white/[0.065] bg-white/[0.025] px-4 py-3 text-sm text-slate-300"
+                      >
+                        {item}
+                      </div>
+                    ))}
+                  </div>
                 </section>
               </div>
             )}

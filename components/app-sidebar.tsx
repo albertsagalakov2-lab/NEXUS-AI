@@ -730,7 +730,7 @@ export function AppSidebar() {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-white/[0.06] bg-[#03050a]/92 px-4 backdrop-blur-xl lg:hidden">
+      <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-white/[0.06] bg-black/92 px-4 backdrop-blur-xl lg:hidden">
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
@@ -755,7 +755,7 @@ export function AppSidebar() {
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-white/[0.055] bg-[#03050a]/96 backdrop-blur-xl transition-[width] duration-300 lg:flex",
+          "fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-white/[0.055] bg-black/96 backdrop-blur-xl transition-[width] duration-300 lg:flex",
           desktopCollapsed ? "w-[72px]" : "w-[248px]",
         )}
       >
@@ -809,7 +809,7 @@ export function AppSidebar() {
             onClick={() => setMobileOpen(false)}
             className="absolute inset-0 bg-black/72 backdrop-blur-[2px]"
           />
-          <aside className="relative flex h-full w-[92vw] min-w-[320px] max-w-[420px] flex-col border-r border-white/[0.07] bg-[#03050a] shadow-[30px_0_80px_rgba(0,0,0,0.55)] max-[360px]:min-w-0">
+          <aside className="relative flex h-full w-[92vw] min-w-[320px] max-w-[420px] flex-col border-r border-white/[0.07] bg-black shadow-[30px_0_80px_rgba(0,0,0,0.55)] max-[360px]:min-w-0">
             {sidebarContents(true)}
           </aside>
         </div>

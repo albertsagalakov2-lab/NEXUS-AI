@@ -37,7 +37,7 @@ export function MobileBottomNav() {
     )
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 grid h-[70px] grid-cols-5 items-center border-t border-white/[0.07] bg-[#03050a]/96 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-50 grid h-[70px] grid-cols-5 items-center border-t border-white/[0.07] bg-black/96 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
       <button type="button" onClick={createNewChat} className={navClass(pathname.startsWith("/chat"))}>
         <SquarePen className="h-5 w-5" />
         <span>Новый чат</span>

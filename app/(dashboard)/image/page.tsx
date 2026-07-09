@@ -40,7 +40,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 
 type ImageModelId =
@@ -395,7 +394,7 @@ export default function ImageGenerationPage() {
   const renderMobileComposer = () => (
     <div className="w-full overflow-hidden rounded-[22px] border border-white/[0.09] bg-[#0a0f1d]/94 shadow-[0_18px_55px_rgba(0,0,0,0.28)] backdrop-blur-xl">
       <div className="px-3.5 pt-3.5 sm:px-4 sm:pt-4">
-        <Textarea
+        <textarea
           value={prompt}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setPrompt(event.target.value)}
           onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -405,7 +404,7 @@ export default function ImageGenerationPage() {
             }
           }}
           placeholder="Опишите изображение..."
-          className="min-h-[76px] resize-none border-0 bg-transparent px-1.5 py-1.5 text-[15px] leading-6 text-white shadow-none placeholder:text-slate-600 focus-visible:ring-0 sm:min-h-[88px] sm:text-base"
+          className="block w-full min-h-[76px] resize-none rounded-none border-0 bg-transparent px-1.5 py-1.5 text-[15px] leading-6 text-white shadow-none outline-none ring-0 placeholder:text-slate-600 focus:border-0 focus:outline-none focus:ring-0 focus-visible:border-0 focus-visible:outline-none focus-visible:ring-0 sm:min-h-[88px] sm:text-base"
         />
 
         {referenceFile && (
@@ -533,8 +532,8 @@ export default function ImageGenerationPage() {
       </div>
 
       <div className="p-4">
-        <div className="rounded-[20px] border border-white/[0.075] bg-[#070b15] p-3.5">
-          <Textarea
+        <div className="rounded-[20px] border border-white/[0.075] bg-[#070b15] p-3.5 focus-within:border-white/[0.075] focus-within:ring-0">
+          <textarea
             value={prompt}
             onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setPrompt(event.target.value)}
             onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -544,7 +543,7 @@ export default function ImageGenerationPage() {
               }
             }}
             placeholder="Опишите изображение, которое хотите создать..."
-            className="min-h-[154px] resize-none border-0 bg-transparent px-1 py-1 text-[15px] leading-6 text-white shadow-none placeholder:text-slate-600 focus-visible:ring-0"
+            className="block w-full min-h-[154px] resize-none rounded-none border-0 bg-transparent px-1 py-1 text-[15px] leading-6 text-white shadow-none outline-none ring-0 placeholder:text-slate-600 focus:border-0 focus:outline-none focus:ring-0 focus-visible:border-0 focus-visible:outline-none focus-visible:ring-0"
           />
 
           {referenceFile && (
@@ -785,8 +784,7 @@ export default function ImageGenerationPage() {
   }
 
   return (
-    <div className="relative min-h-[calc(100dvh-64px)] overflow-x-hidden bg-[#040718] px-3 pb-28 pt-4 sm:px-5 lg:min-h-screen lg:px-7 lg:pb-10 lg:pt-7">
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_50%_-10%,rgba(74,67,255,0.10),transparent_34rem),radial-gradient(circle_at_85%_12%,rgba(14,165,233,0.06),transparent_28rem)]" />
+    <div className="np-image-page relative min-h-[calc(100dvh-64px)] overflow-x-hidden bg-black px-3 pb-28 pt-4 sm:px-5 lg:min-h-screen lg:px-7 lg:pb-10 lg:pt-7">
 
       <input
         ref={fileInputRef}
@@ -888,8 +886,8 @@ export default function ImageGenerationPage() {
       </main>
 
       <Dialog open={modelDialogOpen} onOpenChange={setModelDialogOpen}>
-        <DialogContent className="border-white/[0.09] bg-[#11141b] p-0 text-white sm:max-w-lg max-sm:bottom-0 max-sm:left-0 max-sm:top-auto max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[28px]">
-          <DialogHeader className="border-b border-white/[0.08] px-5 py-5 text-left">
+        <DialogContent className="np-image-model-dialog border-white/[0.075] bg-[#080a10] p-0 text-slate-200 shadow-[0_26px_90px_rgba(0,0,0,0.55)] sm:max-w-lg max-sm:bottom-0 max-sm:left-0 max-sm:top-auto max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[28px]">
+          <DialogHeader className="border-b border-white/[0.055] px-5 py-5 text-left">
             <DialogTitle className="text-xl">Выберите модель</DialogTitle>
             <DialogDescription className="sr-only">Выбор модели генерации изображений</DialogDescription>
           </DialogHeader>
@@ -907,16 +905,16 @@ export default function ImageGenerationPage() {
                   className={cn(
                     "flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition",
                     selected
-                      ? "border-violet-400/45 bg-white/[0.075]"
-                      : "border-white/[0.07] bg-white/[0.025] hover:bg-white/[0.055]"
+                      ? "border-white/[0.13] bg-white/[0.052]"
+                      : "border-white/[0.06] bg-white/[0.022] hover:border-white/[0.10] hover:bg-white/[0.04]"
                   )}
                 >
                   <ModelIcon model={model} />
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-white">{model.label}</p>
+                    <p className="font-medium text-slate-200">{model.label}</p>
                     <p className="mt-0.5 text-sm text-slate-500">{model.description}</p>
                   </div>
-                  {selected && <Check className="h-5 w-5 text-white" />}
+                  {selected && <Check className="h-5 w-5 text-slate-300" />}
                 </button>
               )
             })}

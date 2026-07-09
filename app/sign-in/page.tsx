@@ -33,15 +33,31 @@ export default function SignInPage() {
     setIsLoading(true)
     setError("")
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    const { error } = await supabase.auth
+      .signInWithPassword({
+        email,
+        password,
+      })
+      .catch((error: unknown) => ({
+        error:
+          error instanceof Error
+            ? error
+            : new Error("Не удалось подключиться к Supabase"),
+      }))
 
     setIsLoading(false)
 
     if (error) {
-      setError("Не получилось войти. Проверь email и пароль.")
+      const message = error.message || ""
+      const lowerMessage = message.toLowerCase()
+
+      if (lowerMessage.includes("email not confirmed")) {
+        setError("Email не подтвержден. Подтверди почту в Supabase или отключи подтверждение email.")
+      } else if (lowerMessage.includes("invalid login credentials")) {
+        setError("Supabase отклонил логин или пароль. Проверь, что пользователь создан именно в этом Supabase-проекте и пароль задан.")
+      } else {
+        setError(`Supabase: ${message}`)
+      }
       return
     }
 
@@ -53,7 +69,7 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="flex min-h-screen items-center justify-center bg-black p-4">
       <Card className="w-full max-w-md border-border bg-card">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary">

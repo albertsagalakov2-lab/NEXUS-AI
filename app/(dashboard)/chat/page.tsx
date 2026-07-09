@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { Suspense, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { Suspense, type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowUp,
@@ -84,6 +84,27 @@ const quickActions = [
   },
 ]
 
+const fallingStars = Array.from({ length: 72 }, (_, index) => {
+  const left = (index * 37 + 9) % 100
+  const drift = ((index % 9) - 4) * 18
+  const size = 3 + (index % 5) * 0.6
+  const duration = 14 + (index % 7) * 1.15
+  const delay = -((index * 0.61) % duration)
+  const opacity = 0.5 + (index % 6) * 0.07
+
+  return {
+    id: index,
+    style: {
+      "--float-star-left": `${left}%`,
+      "--float-star-drift": `${drift}px`,
+      "--float-star-size": `${size}px`,
+      "--float-star-duration": `${duration}s`,
+      "--float-star-delay": `${delay}s`,
+      "--float-star-opacity": String(opacity),
+    } as CSSProperties,
+  }
+})
+
 function createTempId() {
   return `temp-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
@@ -131,6 +152,7 @@ function ChatPageContent() {
   const [composerHeight, setComposerHeight] = useState(0)
   const [attachments, setAttachments] = useState<ChatAttachment[]>([])
   const [attachmentError, setAttachmentError] = useState("")
+  const [showFallingStars, setShowFallingStars] = useState(true)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesScrollRef = useRef<HTMLDivElement>(null)
@@ -269,6 +291,7 @@ function ChatPageContent() {
       setInput("")
       setAttachments([])
       setAttachmentError("")
+      setShowFallingStars(true)
       window.localStorage.setItem(ACTIVE_THREAD_STORAGE_KEY, chat.id)
       refreshSidebarChats()
       router.push(`/chat?id=${chat.id}`)
@@ -314,6 +337,7 @@ function ChatPageContent() {
       setInput("")
       setAttachments([])
       setAttachmentError("")
+      setShowFallingStars(true)
       refreshSidebarChats()
     } catch (error) {
       console.error("Reset chat error:", error)
@@ -409,6 +433,8 @@ function ChatPageContent() {
     }
 
     if (!activeChatId) return
+
+    setShowFallingStars(false)
 
     const selectedAttachments = [...attachments]
     const content = input.trim() || "Опиши и проанализируй прикреплённое изображение."
@@ -655,7 +681,7 @@ function ChatPageContent() {
 
   if (!isReady) {
     return (
-      <div className="flex h-full items-center justify-center overflow-hidden bg-[#03050a] lg:h-screen">
+      <div className="flex h-full items-center justify-center overflow-hidden bg-black lg:h-screen">
         <div className="flex items-center gap-2 text-sm text-slate-500">
           <Sparkles className="h-4 w-4 animate-pulse text-violet-400" />
           Загружаем NeiroPeiro...
@@ -665,8 +691,19 @@ function ChatPageContent() {
   }
 
   return (
-    <div className="neiropeiro-workspace relative flex h-full w-full max-w-[100vw] min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-hidden overscroll-none bg-[#03050a] lg:h-screen">
-      <div className="pointer-events-none absolute inset-0 neiropeiro-stars" />
+    <div className="neiropeiro-workspace neiropeiro-chat-workspace relative flex h-full w-full max-w-[100vw] min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-hidden overscroll-none bg-black lg:h-screen">
+      <div className="pointer-events-none absolute inset-0 hidden neiropeiro-stars" />
+      {showFallingStars && !isLoading && !isLoadingMessages && (
+        <div className="pointer-events-none absolute inset-0 hidden lg:block neiropeiro-floating-stars-v2" aria-hidden="true">
+          {fallingStars.map((star) => (
+            <span
+              key={star.id}
+              className="neiropeiro-floating-star-v2"
+              style={star.style}
+            />
+          ))}
+        </div>
+      )}
 
       {!isGuest && (
         <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5 lg:right-5 lg:top-4">
@@ -682,30 +719,28 @@ function ChatPageContent() {
       )}
 
       {isEmptyChat ? (
-        <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col items-center justify-end overflow-x-hidden overflow-y-hidden px-4 pb-[calc(env(safe-area-inset-bottom)+24px)] pt-4 sm:px-6 sm:pb-8 lg:justify-center lg:overflow-y-auto lg:py-12">
+        <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center overflow-x-hidden overflow-y-hidden px-4 py-[calc(env(safe-area-inset-bottom)+22px)] sm:px-6 sm:py-8 lg:overflow-y-auto lg:py-12">
           <div className="w-full min-w-0 max-w-[min(760px,calc(100vw-32px))]">
-            {composer}
-
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:grid-cols-4 sm:gap-2.5">
-              {quickActions.map((action) => (
-                <button
-                  key={action.label}
-                  type="button"
-                  onClick={() => chooseQuickAction(action.prompt)}
-                  className="np-quick-action"
-                >
-                  <action.icon className="h-[18px] w-[18px] shrink-0 text-blue-400" />
-                  <span className="min-w-0 text-left">
-                    <strong className="block text-[12px] font-medium leading-4 text-slate-200 sm:text-[13px]">
-                      {action.label}
-                    </strong>
-                    <small className="mt-0.5 block text-[10px] leading-3 text-slate-600 sm:text-[11px]">
-                      {action.description}
-                    </small>
-                  </span>
-                </button>
-              ))}
+            <div className="hidden lg:block">
+              <div className="np-empty-brand">
+                <div className="np-empty-brand-logo np-brand-logo-frame">
+                  <Image
+                    src="/neiropeiro-mascot.png"
+                    alt="NeiroPeiro"
+                    fill
+                    sizes="52px"
+                    className="object-cover"
+                    priority
+                  />
+                </div>
+                <div className="np-empty-brand-name">
+                  <span>NeiroPeiro</span>
+                  <span className="np-empty-brand-ai">AI</span>
+                </div>
+              </div>
             </div>
+
+            {composer}
 
             {isGuest && (
               <p className="mt-5 text-center text-[11px] text-slate-600">
@@ -827,9 +862,9 @@ function ChatPageContent() {
 
           <div
             ref={composerDockRef}
-            className="absolute inset-x-0 bottom-0 z-[2] border-t border-white/[0.04] bg-[#03050a] px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-3 sm:px-5 sm:pb-4 lg:px-8 lg:pb-4 lg:pt-4"
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] bg-gradient-to-t from-black via-black/92 to-transparent px-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-10 sm:px-5 sm:pb-5 lg:px-8 lg:pb-6"
           >
-            <div className="mx-auto w-full max-w-[820px]">{composer}</div>
+            <div className="pointer-events-auto mx-auto w-full max-w-[760px]">{composer}</div>
           </div>
         </>
       )}
@@ -841,7 +876,7 @@ export default function ChatPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex h-full items-center justify-center overflow-hidden bg-[#03050a] lg:h-screen">
+        <div className="flex h-full items-center justify-center overflow-hidden bg-black lg:h-screen">
           <div className="text-sm text-slate-500">Загрузка...</div>
         </div>
       }
