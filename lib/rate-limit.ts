@@ -2,7 +2,6 @@ type RateLimitScope =
   | "chat"
   | "images-read"
   | "images-write"
-  | "auth-page"
   | "auth-attempt"
   | "auth-user"
 
@@ -35,10 +34,6 @@ const POLICIES: Record<RateLimitScope, RateLimitPolicy> = {
   "images-write": {
     ip: { limit: 20, windowMs: 10 * 60_000 },
     user: { limit: 6, windowMs: 10 * 60_000 },
-  },
-  "auth-page": {
-    ip: { limit: 30, windowMs: 10 * 60_000 },
-    user: { limit: 60, windowMs: 10 * 60_000 },
   },
   "auth-attempt": {
     ip: { limit: 10, windowMs: 10 * 60_000 },

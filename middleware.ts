@@ -1,6 +1,5 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
-import { enforceRateLimit } from "@/lib/rate-limit"
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -42,18 +41,6 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/auth")
 
   const isPublicPage = request.nextUrl.pathname === "/"
-
-  if (
-    request.nextUrl.pathname === "/sign-in" ||
-    request.nextUrl.pathname === "/sign-up"
-  ) {
-    const rateLimited = await enforceRateLimit({
-      request,
-      scope: "auth-page",
-      userId: user?.id,
-    })
-    if (rateLimited) return rateLimited
-  }
 
   if (!user && !isAuthPage && !isPublicPage) {
     const redirectUrl = request.nextUrl.clone()
