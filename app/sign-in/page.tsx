@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,7 +17,6 @@ import { Loader2, Sparkles } from "lucide-react"
 
 export default function SignInPage() {
   const router = useRouter()
-  const supabase = createClient()
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -33,25 +31,28 @@ export default function SignInPage() {
     setIsLoading(true)
     setError("")
 
-    const { error } = await supabase.auth
-      .signInWithPassword({
-        email,
-        password,
-      })
-      .catch((error: unknown) => ({
-        error:
-          error instanceof Error
-            ? error
-            : new Error("Не удалось подключиться к Supabase"),
-      }))
+    const response = await fetch("/api/auth/sign-in", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    }).catch(() => null)
+    const result = await response?.json().catch(() => ({}))
 
     setIsLoading(false)
 
-    if (error) {
-      const message = error.message || ""
+    if (!response?.ok) {
+      const message = String(
+        result?.error || "Не удалось подключиться к серверу"
+      )
       const lowerMessage = message.toLowerCase()
 
-      if (lowerMessage.includes("email not confirmed")) {
+      if (response?.status === 429) {
+        const retryAfter =
+          response.headers.get("Retry-After") || result?.retryAfter || 60
+        setError(`Слишком много попыток. Повторите через ${retryAfter} сек.`)
+      } else if (response?.status === 503) {
+        setError("Защита входа временно недоступна. Попробуйте через минуту.")
+      } else if (lowerMessage.includes("email not confirmed")) {
         setError("Email не подтвержден. Подтверди почту в Supabase или отключи подтверждение email.")
       } else if (lowerMessage.includes("invalid login credentials")) {
         setError("Supabase отклонил логин или пароль. Проверь, что пользователь создан именно в этом Supabase-проекте и пароль задан.")

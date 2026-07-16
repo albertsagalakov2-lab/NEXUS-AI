@@ -29,7 +29,13 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 OPENAI_API_KEY=
 OPENAI_API_BASE_URL=
 OPENAI_MODEL=
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
 ```
+
+Upstash Redis обязателен для серверного rate limiting. При отсутствии или
+недоступности Redis защищённые маршруты возвращают `503`, а при превышении
+лимита — `429 Too Many Requests` с заголовком `Retry-After`.
 
 Не добавляйте `.env.local` в GitHub.
 

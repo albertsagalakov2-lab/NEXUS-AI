@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { enforceRateLimit } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
 
@@ -191,6 +192,13 @@ export async function POST(req: Request) {
     if (!user) {
       return Response.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const rateLimited = await enforceRateLimit({
+      request: req,
+      scope: "chat",
+      userId: user.id,
+    })
+    if (rateLimited) return rateLimited
 
     const contentLength = Number(req.headers.get("content-length") || 0)
     if (contentLength > MAX_REQUEST_BYTES) {

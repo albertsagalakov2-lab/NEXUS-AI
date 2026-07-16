@@ -8,6 +8,7 @@ import {
   type ReferenceFile,
 } from "@/lib/image-generation/providers"
 import { createClient } from "@/lib/supabase/server"
+import { enforceRateLimit } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -196,7 +197,7 @@ async function selectImages(
     .order("created_at", { ascending: false })
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient()
 
   const {
@@ -216,6 +217,13 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
+
+  const rateLimited = await enforceRateLimit({
+    request,
+    scope: "images-read",
+    userId: user.id,
+  })
+  if (rateLimited) return rateLimited
 
   const firstQuery = await selectImages(supabase, user.id)
   if (firstQuery.error) {
@@ -275,6 +283,13 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
+
+    const rateLimited = await enforceRateLimit({
+      request,
+      scope: "images-write",
+      userId: user.id,
+    })
+    if (rateLimited) return rateLimited
 
     const contentType = request.headers.get("content-type") || ""
     let prompt = ""

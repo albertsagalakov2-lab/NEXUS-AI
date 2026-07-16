@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -18,7 +17,6 @@ import { Loader2, Sparkles } from "lucide-react"
 
 export default function SignUpPage() {
   const router = useRouter()
-  const supabase = createClient()
 
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
@@ -36,25 +34,34 @@ export default function SignUpPage() {
     setError("")
     setMessage("")
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/chat`,
-        data: {
-          full_name: fullName,
-        },
-      },
-    })
+    const response = await fetch("/api/auth/sign-up", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, fullName, password }),
+    }).catch(() => null)
+    const result = await response?.json().catch(() => ({}))
 
     setIsLoading(false)
 
-    if (error) {
-      setError("Не получилось зарегистрироваться. Попробуй другой email.")
+    if (!response?.ok) {
+      if (response?.status === 429) {
+        const retryAfter =
+          response.headers.get("Retry-After") || result?.retryAfter || 60
+        setError(`Слишком много попыток. Повторите через ${retryAfter} сек.`)
+      } else if (response?.status === 503) {
+        setError("Защита регистрации временно недоступна. Попробуйте через минуту.")
+      } else {
+        setError(
+          String(
+            result?.error ||
+              "Не получилось зарегистрироваться. Попробуйте другой email."
+          )
+        )
+      }
       return
     }
 
-    if (!data.session) {
+    if (result?.requiresEmailConfirmation) {
       setMessage(
         "Аккаунт создан. Проверь email и подтверди регистрацию по ссылке."
       )
