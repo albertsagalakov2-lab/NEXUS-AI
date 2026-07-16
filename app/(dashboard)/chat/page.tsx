@@ -706,7 +706,7 @@ function ChatPageContent() {
       )}
 
       {!isGuest && (
-        <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5 lg:right-5 lg:top-4">
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-1.5 lg:hidden">
         <button
           type="button"
           onClick={deleteCurrentChat}

@@ -14,9 +14,11 @@ import {
   LogOut,
   Menu,
   Music2,
+  MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
   Pencil,
+  Pin,
   Search,
   Sparkles,
   SquarePen,
@@ -34,6 +36,7 @@ import { cn } from "@/lib/utils";
 const ACTIVE_THREAD_STORAGE_KEY = "nexusai_active_chat_id";
 const RECENT_COLLAPSED_KEY = "nexusai_recent_collapsed";
 const DESKTOP_COLLAPSED_KEY = "neiropeiro_desktop_sidebar_collapsed";
+const PINNED_THREADS_STORAGE_KEY = "nexusai_pinned_chat_ids";
 
 type ChatThread = {
   id: string;
@@ -101,6 +104,8 @@ export function AppSidebar() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [editingThreadId, setEditingThreadId] = useState("");
   const [editingTitle, setEditingTitle] = useState("");
+  const [openThreadMenuId, setOpenThreadMenuId] = useState("");
+  const [pinnedThreadIds, setPinnedThreadIds] = useState<string[]>([]);
 
   const profileName = userName.trim();
   const emailName = userEmail.split("@")[0] || "";
@@ -170,6 +175,18 @@ export function AppSidebar() {
     setDesktopCollapsed(
       window.localStorage.getItem(DESKTOP_COLLAPSED_KEY) === "true",
     );
+    try {
+      const savedPinnedThreads = JSON.parse(
+        window.localStorage.getItem(PINNED_THREADS_STORAGE_KEY) || "[]",
+      );
+      setPinnedThreadIds(
+        Array.isArray(savedPinnedThreads)
+          ? savedPinnedThreads.filter((id): id is string => typeof id === "string")
+          : [],
+      );
+    } catch {
+      setPinnedThreadIds([]);
+    }
 
     loadProfile();
     loadChats();
@@ -206,6 +223,27 @@ export function AppSidebar() {
   }, [loadChats, loadProfile]);
 
   useEffect(() => {
+    if (!openThreadMenuId) return;
+
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest("[data-thread-actions]")) {
+        setOpenThreadMenuId("");
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpenThreadMenuId("");
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [openThreadMenuId]);
+
+  useEffect(() => {
     const shell = document.getElementById("np-dashboard-shell");
     const width = desktopCollapsed ? "72px" : "248px";
 
@@ -226,11 +264,18 @@ export function AppSidebar() {
 
   const filteredThreads = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return threads;
-    return threads.filter((thread) =>
-      thread.title.toLowerCase().includes(query),
+    const visibleThreads = query
+      ? threads.filter((thread) =>
+          thread.title.toLowerCase().includes(query),
+        )
+      : threads;
+    const pinned = new Set(pinnedThreadIds);
+
+    return [...visibleThreads].sort(
+      (first, second) =>
+        Number(pinned.has(second.id)) - Number(pinned.has(first.id)),
     );
-  }, [searchQuery, threads]);
+  }, [pinnedThreadIds, searchQuery, threads]);
 
   const createNewChat = async () => {
     try {
@@ -263,7 +308,22 @@ export function AppSidebar() {
     setActiveThreadId(threadId);
     setMobileOpen(false);
     setSearchOpen(false);
+    setOpenThreadMenuId("");
     router.push(`/chat?id=${threadId}`);
+  };
+
+  const togglePinnedThread = (threadId: string) => {
+    setPinnedThreadIds((current) => {
+      const next = current.includes(threadId)
+        ? current.filter((id) => id !== threadId)
+        : [threadId, ...current];
+      window.localStorage.setItem(
+        PINNED_THREADS_STORAGE_KEY,
+        JSON.stringify(next),
+      );
+      return next;
+    });
+    setOpenThreadMenuId("");
   };
 
   const saveRename = async (threadId: string) => {
@@ -285,6 +345,7 @@ export function AppSidebar() {
       );
       setEditingThreadId("");
       setEditingTitle("");
+      setOpenThreadMenuId("");
       window.dispatchEvent(new Event("nexusai-chats-updated"));
     } catch (error) {
       console.error("Rename chat error:", error);
@@ -294,6 +355,8 @@ export function AppSidebar() {
   const deleteThread = async (threadId: string) => {
     if (!window.confirm("Удалить этот чат?")) return;
 
+    setOpenThreadMenuId("");
+
     try {
       const response = await fetch(`/api/chats/${threadId}`, {
         method: "DELETE",
@@ -302,6 +365,14 @@ export function AppSidebar() {
 
       const nextThreads = threads.filter((thread) => thread.id !== threadId);
       setThreads(nextThreads);
+      setPinnedThreadIds((current) => {
+        const next = current.filter((id) => id !== threadId);
+        window.localStorage.setItem(
+          PINNED_THREADS_STORAGE_KEY,
+          JSON.stringify(next),
+        );
+        return next;
+      });
 
       if (threadId === activeThreadId) {
         if (nextThreads[0]) {
@@ -384,12 +455,14 @@ export function AppSidebar() {
 
   const renderThread = (thread: ChatThread) => {
     const active = thread.id === activeThreadId;
+    const pinned = pinnedThreadIds.includes(thread.id);
+    const menuOpen = openThreadMenuId === thread.id;
 
     return (
       <div
         key={thread.id}
         className={cn(
-          "group flex min-h-9 items-center rounded-lg px-2 transition",
+          "group relative flex min-h-9 items-center rounded-lg px-2 transition",
           active ? "bg-white/[0.065]" : "hover:bg-white/[0.035]",
         )}
       >
@@ -418,31 +491,78 @@ export function AppSidebar() {
             <button
               type="button"
               onClick={() => openThread(thread.id)}
-              className="min-w-0 flex-1 truncate px-1 py-2 text-left text-xs text-slate-400 transition hover:text-white"
+              className="min-w-0 flex-1 truncate px-1 py-2 text-left text-xs text-slate-300 transition hover:text-white"
               title={thread.title}
             >
               {thread.title}
             </button>
-            <div className="flex shrink-0 opacity-100 transition lg:opacity-0 lg:group-hover:opacity-100">
+            {pinned && !menuOpen && (
+              <Pin className="mr-0.5 h-3 w-3 shrink-0 text-slate-500" aria-label="Закреплён" />
+            )}
+            <div
+              data-thread-actions
+              className={cn(
+                "flex shrink-0 transition",
+                menuOpen
+                  ? "opacity-100"
+                  : "opacity-100 lg:opacity-0 lg:group-hover:opacity-100",
+              )}
+            >
               <button
                 type="button"
                 onClick={() => {
-                  setEditingThreadId(thread.id);
-                  setEditingTitle(thread.title);
+                  setOpenThreadMenuId((current) =>
+                    current === thread.id ? "" : thread.id,
+                  );
                 }}
-                className="rounded p-1 text-slate-600 hover:bg-white/5 hover:text-white"
-                title="Переименовать"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-slate-500 transition hover:bg-white/[0.08] hover:text-white"
+                title="Действия с чатом"
+                aria-label={`Действия с чатом «${thread.title}»`}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
               >
-                <Pencil className="h-3 w-3" />
+                <MoreHorizontal className="h-4 w-4" />
               </button>
-              <button
-                type="button"
-                onClick={() => deleteThread(thread.id)}
-                className="rounded p-1 text-slate-600 hover:bg-rose-500/10 hover:text-rose-300"
-                title="Удалить"
-              >
-                <Trash2 className="h-3 w-3" />
-              </button>
+
+              {menuOpen && (
+                <div
+                  role="menu"
+                  aria-label={`Меню чата «${thread.title}»`}
+                  className="absolute right-1 top-8 z-50 w-[138px] rounded-xl border border-white/[0.14] bg-[#232323] p-1.5 text-[13px] text-slate-100 shadow-[0_16px_42px_rgba(0,0,0,0.55)]"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => togglePinnedThread(thread.id)}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition hover:bg-white/[0.08]"
+                  >
+                    <Pin className="h-4 w-4" />
+                    <span>{pinned ? "Открепить" : "Закрепить"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setEditingThreadId(thread.id);
+                      setEditingTitle(thread.title);
+                      setOpenThreadMenuId("");
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition hover:bg-white/[0.08]"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    <span>Переименовать</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => deleteThread(thread.id)}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-red-400 transition hover:bg-red-500/10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Удалить</span>
+                  </button>
+                </div>
+              )}
             </div>
           </>
         )}
@@ -662,7 +782,7 @@ export function AppSidebar() {
           <div className="flex items-center gap-2.5 rounded-xl px-2 py-2">
             <Link
               href="/profile"
-              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-violet-400/70"
+              className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg outline-none transition hover:opacity-90 focus-visible:ring-0"
             >
               <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-400 via-violet-500 to-fuchsia-500 text-[11px] font-semibold text-white ring-1 ring-white/10">
                 {avatarUrl ? (

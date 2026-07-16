@@ -8,6 +8,8 @@ import {
   Building2,
   Camera,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Coins,
   Crown,
   CreditCard,
@@ -22,7 +24,6 @@ import {
   MessageSquare,
   MonitorPlay,
   MoreHorizontal,
-  Palette,
   Pencil,
   Save,
   Sparkles,
@@ -40,7 +41,6 @@ type AccountSection =
   | "profile"
   | "organization"
   | "settings"
-  | "appearance"
   | "media"
   | "partner"
   | "support"
@@ -61,9 +61,7 @@ const accountItems: Array<{
   icon: typeof User;
 }> = [
   { id: "profile", label: "Профиль", icon: User },
-  { id: "organization", label: "Организация", icon: Building2 },
   { id: "settings", label: "Настройки", icon: Settings },
-  { id: "appearance", label: "Внешний вид", icon: Palette },
   { id: "media", label: "Медиа", icon: MonitorPlay },
   { id: "partner", label: "Партнёрство", icon: Handshake },
   { id: "support", label: "Поддержка", icon: LifeBuoy },
@@ -407,6 +405,41 @@ export default function ProfilePage() {
     window.location.href = "/sign-in";
   };
 
+  const renderMobileMenuItem = (
+    id: AccountSection,
+    description?: string,
+  ) => {
+    const item = accountItems.find((entry) => entry.id === id);
+    if (!item) return null;
+
+    const Icon = item.icon;
+
+    return (
+      <button
+        key={id}
+        type="button"
+        onClick={() => setActiveSection(id)}
+        className={cn(
+          "flex w-full items-center gap-4 rounded-2xl px-1 py-3 text-left transition",
+          activeSection === id ? "text-white" : "text-slate-300",
+        )}
+      >
+        <Icon className="h-5 w-5 shrink-0 text-slate-200" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[17px] font-medium leading-6">
+            {item.label}
+          </span>
+          {description && (
+            <span className="mt-0.5 block truncate text-sm text-slate-500">
+              {description}
+            </span>
+          )}
+        </span>
+        <ChevronRight className="h-4 w-4 shrink-0 text-slate-600" />
+      </button>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-[#03050a] p-6 lg:min-h-screen">
@@ -438,7 +471,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#03050a] px-3 pb-24 pt-4 text-white [scrollbar-gutter:stable] sm:px-6 lg:h-dvh lg:min-h-0 lg:overflow-y-scroll lg:px-8 lg:pb-10 lg:pt-8">
+    <div className="h-full min-h-0 overflow-y-auto bg-[#03050a] px-3 pb-24 pt-4 text-white [scrollbar-gutter:stable] sm:px-6 lg:h-dvh lg:px-8 lg:pb-10 lg:pt-8">
       <div className="mx-auto w-full max-w-6xl">
         <div className="mb-4 flex min-h-[52px] items-center justify-between gap-3 lg:mb-7">
           <div>
@@ -446,7 +479,7 @@ export default function ProfilePage() {
               Аккаунт
             </p>
             <h1 className="mt-1 text-xl font-semibold tracking-tight sm:text-3xl">
-              Профиль
+              Профиль и настройки
             </h1>
           </div>
           <Link
@@ -458,27 +491,77 @@ export default function ProfilePage() {
           </Link>
         </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl border border-white/[0.07] bg-[#070a12] p-2 lg:hidden">
-          {accountItems.map((item) => {
-            const Icon = item.icon;
-            return (
+        {activeSection === "profile" && (
+        <div className="mb-6 lg:hidden">
+          <section className="rounded-[28px] border border-white/[0.07] bg-black px-4 py-6 text-center">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-cyan-400 via-violet-500 to-fuchsia-500 text-3xl font-semibold text-white ring-1 ring-white/10">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={displayName}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                initials
+              )}
+            </div>
+            <h2 className="mt-4 truncate text-2xl font-semibold text-white">
+              {displayName}
+            </h2>
+            <p className="mt-1 truncate text-sm text-slate-400">{email}</p>
+
+            <button
+              type="button"
+              onClick={() => router.push("/pricing")}
+              className="mt-7 flex w-full items-center gap-3 rounded-2xl px-1 py-3 text-left text-white"
+            >
+              <span className="min-w-0 flex-1 text-[17px] font-medium">
+                {plan && plan.toLowerCase() !== "free"
+                  ? getPlanLabel(plan)
+                  : "Нет подписки"}
+              </span>
+              <Sparkles className="h-5 w-5 shrink-0 text-slate-300" />
+              <ChevronRight className="h-4 w-4 shrink-0 text-slate-600" />
+            </button>
+          </section>
+
+          <div className="mt-7 space-y-7">
+            <section>
+              <p className="mb-3 text-sm font-medium text-slate-500">
+                Управление
+              </p>
+              <div className="space-y-1">
+                {renderMobileMenuItem("settings")}
+              </div>
+            </section>
+
+            <section className="border-t border-white/[0.1] pt-5">
+              <p className="mb-3 text-sm font-medium text-slate-500">
+                Сервисы
+              </p>
+              <div className="space-y-1">
+                {renderMobileMenuItem("media", "Изображения, видео и проекты")}
+                {renderMobileMenuItem("pricing", "Подписки и лимиты")}
+                {renderMobileMenuItem("tokens", "История расхода")}
+                {renderMobileMenuItem("partner")}
+                {renderMobileMenuItem("support")}
+                {renderMobileMenuItem("more")}
+              </div>
+            </section>
+
+            <section className="border-t border-white/[0.1] pt-5">
               <button
-                key={item.id}
                 type="button"
-                onClick={() => setActiveSection(item.id)}
-                className={cn(
-                  "flex h-10 min-w-0 items-center gap-2 rounded-xl border px-3 text-left text-xs transition",
-                  activeSection === item.id
-                    ? "border-violet-400/35 bg-violet-500/12 text-white"
-                    : "border-white/[0.07] bg-white/[0.025] text-slate-400",
-                )}
+                onClick={handleSignOut}
+                className="flex w-full items-center gap-4 rounded-2xl px-1 py-3 text-left text-slate-300 transition hover:text-rose-300"
               >
-                <Icon className="h-4 w-4" />
-                {item.label}
+                <LogOut className="h-5 w-5 shrink-0" />
+                <span className="text-[17px] font-medium">Выйти</span>
               </button>
-            );
-          })}
+            </section>
+          </div>
         </div>
+        )}
 
         <div className="grid items-start gap-6 lg:grid-cols-[210px_minmax(0,1fr)]">
           <aside className="hidden rounded-2xl border border-white/[0.07] bg-[#070a12] p-2 lg:sticky lg:top-8 lg:block">
@@ -517,7 +600,22 @@ export default function ProfilePage() {
             </button>
           </aside>
 
-          <main className="min-h-[620px] min-w-0 w-full">
+          <main
+            className={cn(
+              "min-h-[620px] min-w-0 w-full",
+              activeSection === "profile" && "hidden lg:block",
+            )}
+          >
+            {activeSection !== "profile" && (
+              <button
+                type="button"
+                onClick={() => setActiveSection("profile")}
+                className="mb-4 flex items-center gap-2 text-sm font-medium text-slate-400 transition hover:text-white lg:hidden"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Профиль и настройки
+              </button>
+            )}
             {activeSection === "profile" && (
               <div className="min-h-[620px] w-full space-y-4 sm:space-y-5">
                 <section className="rounded-2xl border border-white/[0.075] bg-[#070a12] p-3.5 sm:p-5">
@@ -570,7 +668,7 @@ export default function ProfilePage() {
                               }
                             }}
                             placeholder="Введите имя"
-                            className="h-10 min-w-0 flex-1 rounded-xl border border-white/[0.1] bg-white/[0.035] px-3 text-sm font-semibold text-white outline-none transition placeholder:text-slate-600 focus:border-violet-400/45 sm:text-base"
+                            className="h-10 min-w-0 flex-1 rounded-xl border border-white/[0.1] bg-white/[0.035] px-3 text-sm font-semibold text-white outline-none transition placeholder:text-slate-600 focus:border-white/[0.16] sm:text-base"
                             autoFocus
                           />
                           <div className="flex shrink-0 items-center gap-2">
@@ -633,7 +731,7 @@ export default function ProfilePage() {
                                 }
                               }}
                               placeholder="Введите имя"
-                              className="h-10 min-w-0 flex-1 rounded-xl border border-white/[0.08] bg-[#0b0f19] px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-violet-400/45"
+                              className="h-10 min-w-0 flex-1 rounded-xl border border-white/[0.08] bg-[#0b0f19] px-3 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-white/[0.16]"
                               autoFocus
                             />
                             <Button
@@ -872,43 +970,6 @@ export default function ProfilePage() {
                         <span className="h-6 w-11 rounded-full border border-violet-400/25 bg-violet-500/20 p-0.5">
                           <span className="block h-5 w-5 rounded-full bg-violet-300" />
                         </span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              </div>
-            )}
-
-            {activeSection === "appearance" && (
-              <div className="min-h-[620px] w-full space-y-5">
-                <section className="rounded-2xl border border-white/[0.075] bg-[#070a12] p-5 sm:p-6">
-                  <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/12 text-violet-300">
-                        <Palette className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-semibold">Внешний вид</h2>
-                        <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
-                          Цвета NeiroPeiro остаются основой, а отдельные параметры можно настроить в редакторе.
-                        </p>
-                      </div>
-                    </div>
-                    <Link
-                      href="/profile/appearance"
-                      className="inline-flex h-10 items-center justify-center rounded-xl bg-gradient-to-r from-violet-500 to-blue-500 px-4 text-sm font-medium text-white transition hover:brightness-110"
-                    >
-                      Открыть редактор
-                    </Link>
-                  </div>
-
-                  <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                    {["Космический фон", "Фиолетово-синяя гамма", "Мягкие панели"].map((item) => (
-                      <div
-                        key={item}
-                        className="rounded-xl border border-white/[0.065] bg-white/[0.025] px-4 py-3 text-sm text-slate-300"
-                      >
-                        {item}
                       </div>
                     ))}
                   </div>

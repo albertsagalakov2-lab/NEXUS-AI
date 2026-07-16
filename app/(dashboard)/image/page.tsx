@@ -886,7 +886,7 @@ export default function ImageGenerationPage() {
       </main>
 
       <Dialog open={modelDialogOpen} onOpenChange={setModelDialogOpen}>
-        <DialogContent className="np-image-model-dialog border-white/[0.075] bg-[#080a10] p-0 text-slate-200 shadow-[0_26px_90px_rgba(0,0,0,0.55)] sm:max-w-lg max-sm:bottom-0 max-sm:left-0 max-sm:top-auto max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[28px]">
+        <DialogContent className="np-image-model-dialog border-white/[0.075] bg-[#080a10] p-0 text-slate-200 shadow-[0_26px_90px_rgba(0,0,0,0.55)] sm:max-w-lg max-md:bottom-0 max-md:left-0 max-md:top-auto max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-b-none max-md:rounded-t-[28px]">
           <DialogHeader className="border-b border-white/[0.055] px-5 py-5 text-left">
             <DialogTitle className="text-xl">Выберите модель</DialogTitle>
             <DialogDescription className="sr-only">Выбор модели генерации изображений</DialogDescription>

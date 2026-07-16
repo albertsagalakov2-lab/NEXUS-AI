@@ -29,6 +29,13 @@ const ALLOWED_ASPECT_RATIOS = [
 ]
 
 const ALLOWED_IMAGE_SIZES = ["1K", "2K", "4K"] as const
+const ALLOWED_REFERENCE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+])
+const MAX_PROMPT_LENGTH = 2_000
+const MAX_REFERENCE_FILES = 1
 const MAX_REFERENCE_BYTES = 4 * 1024 * 1024
 const TASK_PREFIX = "kie-task:"
 
@@ -44,7 +51,7 @@ type ImageRow = {
 }
 
 function isAllowedReferenceType(mimeType: string) {
-  return mimeType.startsWith("image/") || mimeType.startsWith("video/")
+  return ALLOWED_REFERENCE_TYPES.has(mimeType.toLowerCase())
 }
 
 function getExtension(mimeType: string) {
@@ -170,7 +177,9 @@ async function refreshPendingRows(
       } catch (error) {
         // Сетевые ошибки не помечаем как окончательный сбой: следующий опрос
         // повторит проверку задачи Kie.ai.
-        console.error(`Image task refresh failed for ${row.id}:`, error)
+        console.error("Image task refresh failed:", {
+          type: error instanceof Error ? error.name : "UnknownError",
+        })
       }
     })
   )
@@ -192,7 +201,17 @@ export async function GET() {
 
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser()
+
+  if (authError) {
+    console.error("Images API auth error:", {
+      type: authError.name,
+      message: authError.message,
+    })
+
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -200,7 +219,15 @@ export async function GET() {
 
   const firstQuery = await selectImages(supabase, user.id)
   if (firstQuery.error) {
-    return NextResponse.json({ error: firstQuery.error.message }, { status: 500 })
+    console.error("Images query failed:", {
+      code: firstQuery.error.code,
+      message: firstQuery.error.message,
+    })
+
+    return NextResponse.json(
+      { error: "Не удалось получить результат генерации." },
+      { status: 500 }
+    )
   }
 
   const rows = (firstQuery.data || []) as ImageRow[]
@@ -213,8 +240,13 @@ export async function GET() {
 
   const refreshedQuery = await selectImages(supabase, user.id)
   if (refreshedQuery.error) {
+    console.error("Images refresh query failed:", {
+      code: refreshedQuery.error.code,
+      message: refreshedQuery.error.message,
+    })
+
     return NextResponse.json(
-      { error: refreshedQuery.error.message },
+      { error: "Не удалось получить результат генерации." },
       { status: 500 }
     )
   }
@@ -228,7 +260,17 @@ export async function POST(request: Request) {
 
     const {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser()
+
+    if (authError) {
+      console.error("Images API auth error:", {
+        type: authError.name,
+        message: authError.message,
+      })
+
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
 
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -248,11 +290,22 @@ export async function POST(request: Request) {
       aspectRatio = String(form.get("aspect_ratio") || "1:1")
       imageSize = String(form.get("image_size") || "1K") as typeof imageSize
 
-      const file = form.get("file")
-      if (file instanceof File && file.size > 0) {
+      const files = form
+        .getAll("file")
+        .filter((value): value is File => value instanceof File && value.size > 0)
+
+      if (files.length > MAX_REFERENCE_FILES) {
+        return NextResponse.json(
+          { error: "Можно прикрепить не более одного изображения." },
+          { status: 400 }
+        )
+      }
+
+      const file = files[0]
+      if (file) {
         if (!isAllowedReferenceType(file.type)) {
           return NextResponse.json(
-            { error: "Можно прикрепить только изображение или видео" },
+            { error: "Поддерживаются только JPEG, PNG и WEBP." },
             { status: 400 }
           )
         }
@@ -285,6 +338,13 @@ export async function POST(request: Request) {
       )
     }
 
+    if (prompt.length > MAX_PROMPT_LENGTH) {
+      return NextResponse.json(
+        { error: "Описание не может превышать 2000 символов." },
+        { status: 400 }
+      )
+    }
+
     if (!ALLOWED_MODELS.includes(model)) {
       return NextResponse.json(
         { error: "Неизвестная модель генерации" },
@@ -293,11 +353,17 @@ export async function POST(request: Request) {
     }
 
     if (!ALLOWED_ASPECT_RATIOS.includes(aspectRatio)) {
-      aspectRatio = "1:1"
+      return NextResponse.json(
+        { error: "Неподдерживаемое соотношение сторон." },
+        { status: 400 }
+      )
     }
 
     if (!ALLOWED_IMAGE_SIZES.includes(imageSize)) {
-      imageSize = "1K"
+      return NextResponse.json(
+        { error: "Неподдерживаемый размер изображения." },
+        { status: 400 }
+      )
     }
 
     const task = await createImageTask({
@@ -322,7 +388,15 @@ export async function POST(request: Request) {
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error("Image generation insert failed:", {
+        code: error.code,
+        message: error.message,
+      })
+
+      return NextResponse.json(
+        { error: "Не удалось запустить генерацию изображения." },
+        { status: 500 }
+      )
     }
 
     return NextResponse.json({
@@ -331,16 +405,13 @@ export async function POST(request: Request) {
       provider_model: task.providerModel,
     })
   } catch (error) {
-    console.error("Image generation error:", error)
+    console.error("Image generation failed:", {
+      type: error instanceof Error ? error.name : "UnknownError",
+    })
 
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Не получилось запустить генерацию изображения",
-      },
-      { status: 500 }
+      { error: "Не удалось запустить генерацию изображения." },
+      { status: 502 }
     )
   }
 }

@@ -10,7 +10,17 @@ export async function DELETE(
 
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser()
+
+  if (authError) {
+    console.error("Image delete auth error:", {
+      type: authError.name,
+      message: authError.message,
+    })
+
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -23,7 +33,15 @@ export async function DELETE(
     .eq("user_id", user.id)
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error("Image delete failed:", {
+      code: error.code,
+      message: error.message,
+    })
+
+    return NextResponse.json(
+      { error: "Не удалось удалить изображение." },
+      { status: 500 }
+    )
   }
 
   return NextResponse.json({ success: true })

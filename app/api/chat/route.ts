@@ -1,3 +1,5 @@
+import { createClient } from "@/lib/supabase/server"
+
 export const runtime = "nodejs"
 
 type ChatContentPart =
@@ -5,8 +7,49 @@ type ChatContentPart =
   | { type: "image_url"; image_url: { url: string } }
 
 type ChatMessage = {
-  role: "system" | "user" | "assistant"
+  role: "user" | "assistant"
   content: string | ChatContentPart[]
+}
+
+type MessageValidationResult =
+  | { ok: true; messages: ChatMessage[] }
+  | { ok: false; error: string }
+
+const MAX_MESSAGES = 30
+const MAX_MESSAGE_TEXT_LENGTH = 4_000
+const MAX_TOTAL_TEXT_LENGTH = 12_000
+const MAX_IMAGES = 3
+const MAX_IMAGE_DATA_URL_LENGTH = 7 * 1024 * 1024
+const MAX_REQUEST_BYTES = 24 * 1024 * 1024
+const PROVIDER_TIMEOUT_MS = 55_000
+
+function validateImageUrl(value: unknown) {
+  if (typeof value !== "string" || value.length === 0) {
+    return { ok: false as const, error: "Некорректное изображение." }
+  }
+
+  if (value.startsWith("data:")) {
+    if (value.length > MAX_IMAGE_DATA_URL_LENGTH) {
+      return { ok: false as const, error: "Изображение слишком большое." }
+    }
+
+    if (!/^data:image\/(png|jpe?g|webp|gif);base64,/i.test(value)) {
+      return { ok: false as const, error: "Некорректное изображение." }
+    }
+
+    return { ok: true as const }
+  }
+
+  try {
+    const url = new URL(value)
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      return { ok: false as const, error: "Некорректное изображение." }
+    }
+  } catch {
+    return { ok: false as const, error: "Некорректное изображение." }
+  }
+
+  return { ok: true as const }
 }
 
 function messageContainsImage(message: unknown): boolean {
@@ -21,34 +64,156 @@ function messageContainsImage(message: unknown): boolean {
   })
 }
 
-function normalizeMessages(value: unknown): ChatMessage[] {
-  if (!Array.isArray(value)) return []
+function validateMessages(value: unknown): MessageValidationResult {
+  if (!Array.isArray(value) || value.length === 0) {
+    return { ok: false, error: "Добавьте хотя бы одно сообщение." }
+  }
 
-  return value.filter((message): message is ChatMessage => {
-    if (!message || typeof message !== "object") return false
+  if (value.length > MAX_MESSAGES) {
+    return { ok: false, error: "Можно отправить не более 30 сообщений." }
+  }
 
-    const role = (message as { role?: unknown }).role
-    const content = (message as { content?: unknown }).content
+  const messages: ChatMessage[] = []
+  let totalTextLength = 0
+  let imageCount = 0
 
-    const validRole =
-      role === "system" || role === "user" || role === "assistant"
-    const validContent = typeof content === "string" || Array.isArray(content)
+  for (const valueItem of value) {
+    if (!valueItem || typeof valueItem !== "object" || Array.isArray(valueItem)) {
+      return { ok: false, error: "Некорректный формат сообщений." }
+    }
 
-    return validRole && validContent
-  })
+    const role = (valueItem as { role?: unknown }).role
+    const content = (valueItem as { content?: unknown }).content
+
+    if (role !== "user" && role !== "assistant") {
+      return {
+        ok: false,
+        error: "Разрешены только роли user и assistant.",
+      }
+    }
+
+    let messageTextLength = 0
+    let hasContent = false
+
+    if (typeof content === "string") {
+      messageTextLength = content.length
+      hasContent = content.trim().length > 0
+    } else if (Array.isArray(content) && content.length > 0) {
+      for (const part of content) {
+        if (!part || typeof part !== "object" || Array.isArray(part)) {
+          return { ok: false, error: "Некорректный формат сообщений." }
+        }
+
+        const partType = (part as { type?: unknown }).type
+
+        if (partType === "text") {
+          const text = (part as { text?: unknown }).text
+          if (typeof text !== "string") {
+            return { ok: false, error: "Некорректный формат сообщений." }
+          }
+
+          messageTextLength += text.length
+          hasContent ||= text.trim().length > 0
+          continue
+        }
+
+        if (partType === "image_url") {
+          const imageUrl = (part as {
+            image_url?: { url?: unknown }
+          }).image_url?.url
+          const imageValidation = validateImageUrl(imageUrl)
+
+          if (!imageValidation.ok) {
+            return imageValidation
+          }
+
+          imageCount += 1
+          hasContent = true
+
+          if (imageCount > MAX_IMAGES) {
+            return {
+              ok: false,
+              error: "Можно прикрепить не более 3 изображений.",
+            }
+          }
+
+          continue
+        }
+
+        return { ok: false, error: "Некорректный формат сообщений." }
+      }
+    } else {
+      return { ok: false, error: "Некорректный формат сообщений." }
+    }
+
+    if (!hasContent) {
+      return { ok: false, error: "Сообщение не может быть пустым." }
+    }
+
+    if (messageTextLength > MAX_MESSAGE_TEXT_LENGTH) {
+      return {
+        ok: false,
+        error: "Одно сообщение не может превышать 4000 символов.",
+      }
+    }
+
+    totalTextLength += messageTextLength
+    if (totalTextLength > MAX_TOTAL_TEXT_LENGTH) {
+      return {
+        ok: false,
+        error: "Общий объём текста не может превышать 12000 символов.",
+      }
+    }
+
+    messages.push({ role, content: content as ChatMessage["content"] })
+  }
+
+  return { ok: true, messages }
 }
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const messages = normalizeMessages(body.messages)
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
-    if (messages.length === 0) {
+    if (authError) {
+      console.error("Chat API auth error:", {
+        type: authError.name,
+        message: authError.message,
+      })
+
+      return Response.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    if (!user) {
+      return Response.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const contentLength = Number(req.headers.get("content-length") || 0)
+    if (contentLength > MAX_REQUEST_BYTES) {
+      return Response.json({ error: "Запрос слишком большой." }, { status: 400 })
+    }
+
+    const body = await req.json().catch(() => null)
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
       return Response.json(
-        { error: "Сообщения не переданы" },
+        { error: "Некорректная структура запроса." },
         { status: 400 }
       )
     }
+
+    const validation = validateMessages(
+      (body as { messages?: unknown }).messages
+    )
+
+    if (!validation.ok) {
+      return Response.json({ error: validation.error }, { status: 400 })
+    }
+
+    const messages = validation.messages
 
     const apiKey =
       process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY
@@ -62,11 +227,10 @@ export async function POST(req: Request) {
     const model = hasImages ? visionModel : textModel
 
     if (!apiKey) {
+      console.error("Chat API configuration error: provider key is missing")
+
       return Response.json(
-        {
-          error:
-            "В Vercel не настроен OPENROUTER_API_KEY или OPENAI_API_KEY",
-        },
+        { error: "Не удалось обработать запрос. Попробуйте позже." },
         { status: 500 }
       )
     }
@@ -92,24 +256,18 @@ export async function POST(req: Request) {
         ],
         temperature: 0.7,
       }),
+      signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
     })
 
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error("OpenRouter error:", {
+      console.error("Chat provider request failed:", {
         status: response.status,
-        model,
-        hasImages,
-        errorText,
+        statusText: response.statusText,
       })
 
       return Response.json(
-        {
-          error: errorText,
-          model,
-          hasImages,
-        },
-        { status: response.status }
+        { error: "Не удалось обработать запрос. Попробуйте позже." },
+        { status: response.status === 408 ? 504 : 502 }
       )
     }
 
@@ -121,11 +279,18 @@ export async function POST(req: Request) {
       hasImages,
     })
   } catch (error) {
-    console.error("Chat API error:", error)
+    const isTimeout =
+      error instanceof Error &&
+      (error.name === "TimeoutError" || error.name === "AbortError")
+
+    console.error("Chat API request failed:", {
+      type: error instanceof Error ? error.name : "UnknownError",
+      message: error instanceof Error ? error.message : "Unknown error",
+    })
 
     return Response.json(
-      { error: "Ошибка Chat API" },
-      { status: 500 }
+      { error: "Не удалось обработать запрос. Попробуйте позже." },
+      { status: isTimeout ? 504 : 500 }
     )
   }
 }

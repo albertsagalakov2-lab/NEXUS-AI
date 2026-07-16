@@ -1,4 +1,3 @@
-import { AppearanceProvider } from "@/components/appearance-provider"
 import type { Metadata, Viewport } from "next"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
@@ -43,7 +42,6 @@ export default function RootLayout({
   return (
     <html lang="ru" className="dark min-h-full bg-[#03050a]">
       <body className="min-h-[100dvh] overflow-x-hidden bg-[#03050a] font-sans antialiased">
-        <AppearanceProvider />
         {children}
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>

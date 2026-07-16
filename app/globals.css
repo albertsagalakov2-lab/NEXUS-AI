@@ -30,7 +30,7 @@
 
   --border: rgba(255, 255, 255, 0.1);
   --input: #10162f;
-  --ring: #a855f7;
+  --ring: rgba(255, 255, 255, 0.18);
 
   --chart-1: #a855f7;
   --chart-2: oklch(0.6 0.118 184.704);
@@ -47,7 +47,7 @@
   --sidebar-accent: #111733;
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: rgba(255, 255, 255, 0.1);
-  --sidebar-ring: #a855f7;
+  --sidebar-ring: rgba(255, 255, 255, 0.18);
 }
 
 .dark {
@@ -77,7 +77,7 @@
 
   --border: rgba(255, 255, 255, 0.1);
   --input: #10162f;
-  --ring: #a855f7;
+  --ring: rgba(255, 255, 255, 0.18);
 
   --chart-1: #a855f7;
   --chart-2: oklch(0.6 0.118 184.704);
@@ -92,7 +92,7 @@
   --sidebar-accent: #111733;
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: rgba(255, 255, 255, 0.1);
-  --sidebar-ring: #a855f7;
+  --sidebar-ring: rgba(255, 255, 255, 0.18);
 }
 
 @theme inline {
@@ -441,7 +441,7 @@ button[role='combobox'] {
 input:focus,
 textarea:focus,
 button[role='combobox']:focus {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
+  box-shadow: none;
 }
 
 /* Мягкое появление overlay/modal окон */
@@ -1721,6 +1721,40 @@ html {
 .np-image-model-dialog button:focus-visible {
   box-shadow: none !important;
   outline: 0 !important;
+}
+
+@media (max-width: 767px) {
+  .np-image-model-dialog,
+  .np-image-model-dialog[data-state="open"],
+  .np-image-model-dialog[data-state="closed"] {
+    animation: none !important;
+    transform: none !important;
+    filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background: #0b0c11 !important;
+    opacity: 1 !important;
+    text-rendering: geometricPrecision;
+  }
+
+  .np-image-model-dialog button {
+    border-color: rgb(255 255 255 / 0.1) !important;
+    background: #14151b !important;
+  }
+
+  .np-image-model-dialog button[aria-selected="true"] {
+    border-color: rgb(255 255 255 / 0.18) !important;
+    background: #1b1c23 !important;
+  }
+
+  .np-image-model-dialog h2,
+  .np-image-model-dialog button p:first-child {
+    color: #f1f3f5 !important;
+  }
+
+  .np-image-model-dialog button p:last-child {
+    color: #a9afb9 !important;
+  }
 }
 
 /* Restore the original desktop chat comet layer. Keep this last so later experiments cannot override it. */
